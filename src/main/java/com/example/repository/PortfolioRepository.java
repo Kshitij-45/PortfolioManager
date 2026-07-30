@@ -1,9 +1,155 @@
 package com.example.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
 
 import com.example.entity.Portfolio;
 
-public interface PortfolioRepository extends JpaRepository<Portfolio, Integer> {
-    
+@Repository
+public class PortfolioRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    public PortfolioRepository(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    private final RowMapper<Portfolio> portfolioRowMapper = new RowMapper<Portfolio>() {
+        @Override
+        public Portfolio mapRow(ResultSet rs, int rowNum) throws SQLException {
+
+            Portfolio portfolio = new Portfolio();
+
+            portfolio.setId(rs.getInt("id"));
+            portfolio.setSymbol(rs.getString("symbol"));
+            portfolio.setCompanyName(rs.getString("company_name"));
+            portfolio.setAssetType(rs.getString("asset_type"));
+            portfolio.setQuantity(rs.getInt("quantity"));
+            portfolio.setBuyPrice(rs.getDouble("buy_price"));
+            portfolio.setCurrentPrice(rs.getDouble("current_price"));
+
+            return portfolio;
+        }
+    };
+
+    // Get All Assets
+    public List<Portfolio> findAll() {
+
+        String sql = """
+                SELECT id,
+                       symbol,
+                       company_name,
+                       asset_type,
+                       quantity,
+                       buy_price,
+                       current_price
+                FROM portfolio
+                """;
+
+        return jdbcTemplate.query(sql, portfolioRowMapper);
+    }
+
+    // Get Asset By Id
+    public Optional<Portfolio> findById(Integer id) {
+
+        String sql = """
+                SELECT id,
+                       symbol,
+                       company_name,
+                       asset_type,
+                       quantity,
+                       buy_price,
+                       current_price
+                FROM portfolio
+                WHERE id = ?
+                """;
+
+        List<Portfolio> portfolios = jdbcTemplate.query(sql, portfolioRowMapper, id);
+
+        return portfolios.stream().findFirst();
+    }
+
+    // Save or Update Asset
+    public Portfolio save(Portfolio portfolio) {
+
+        if (portfolio.getId() == null) {
+
+            String insertSql = """
+                    INSERT INTO portfolio
+                    (symbol, company_name, asset_type, quantity, buy_price, current_price)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """;
+
+            jdbcTemplate.update(
+                    insertSql,
+                    portfolio.getSymbol(),
+                    portfolio.getCompanyName(),
+                    portfolio.getAssetType(),
+                    portfolio.getQuantity(),
+                    portfolio.getBuyPrice(),
+                    portfolio.getCurrentPrice());
+
+            Integer generatedId = jdbcTemplate.queryForObject(
+                    "SELECT LAST_INSERT_ID()",
+                    Integer.class);
+
+            portfolio.setId(generatedId);
+
+        } else {
+
+            String updateSql = """
+                    UPDATE portfolio
+                    SET symbol = ?,
+                        company_name = ?,
+                        asset_type = ?,
+                        quantity = ?,
+                        buy_price = ?,
+                        current_price = ?
+                    WHERE id = ?
+                    """;
+
+            jdbcTemplate.update(
+                    updateSql,
+                    portfolio.getSymbol(),
+                    portfolio.getCompanyName(),
+                    portfolio.getAssetType(),
+                    portfolio.getQuantity(),
+                    portfolio.getBuyPrice(),
+                    portfolio.getCurrentPrice(),
+                    portfolio.getId());
+        }
+
+        return portfolio;
+    }
+
+    // Delete Asset
+    public void deleteById(Integer id) {
+
+        String sql = """
+                DELETE FROM portfolio
+                WHERE id = ?
+                """;
+
+        jdbcTemplate.update(sql, id);
+    }
+
+    // Check if Asset Exists
+    public boolean existsById(Integer id) {
+
+        String sql = """
+                SELECT COUNT(*)
+                FROM portfolio
+                WHERE id = ?
+                """;
+
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+
+        return count != null && count > 0;
+    }
 }
