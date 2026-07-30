@@ -25,6 +25,9 @@ const state = {
 const ui = {
   holdingForm: document.getElementById("holdingForm"),
   openAddPanelBtn: document.getElementById("openAddPanelBtn"),
+  openAddFromHoldingsBtn: document.getElementById("openAddFromHoldingsBtn"),
+  addAssetModal: document.getElementById("addAssetModal"),
+  closeAddAssetModalBtn: document.getElementById("closeAddAssetModalBtn"),
   jumpHoldingsBtn: document.getElementById("jumpHoldingsBtn"),
   holdingsBody: document.getElementById("holdingsBody"),
   rowTemplate: document.getElementById("holdingRowTemplate"),
@@ -66,15 +69,53 @@ function attachEvents() {
   ui.holdingForm.addEventListener("submit", onHoldingAdd);
   ui.holdingsBody.addEventListener("click", onHoldingAction);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
-  ui.openAddPanelBtn.addEventListener("click", () => {
-    document.getElementById("assetEditor").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  ui.openAddPanelBtn.addEventListener("click", openAddAssetModal);
+  if (ui.openAddFromHoldingsBtn) {
+    ui.openAddFromHoldingsBtn.addEventListener("click", openAddAssetModal);
+  }
+  ui.closeAddAssetModalBtn.addEventListener("click", closeAddAssetModal);
+  ui.addAssetModal.addEventListener("click", onModalClick);
   ui.jumpHoldingsBtn.addEventListener("click", () => {
     document.getElementById("holdingsSection").scrollIntoView({ behavior: "smooth", block: "start" });
   });
   ui.holdingsSearch.addEventListener("input", onViewControlChange);
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
+  document.addEventListener("keydown", onGlobalKeyDown);
+}
+
+function openAddAssetModal() {
+  ui.addAssetModal.classList.remove("hidden");
+  ui.addAssetModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+
+  const firstInput = ui.holdingForm.querySelector("input[name=\"ticker\"]");
+  if (firstInput instanceof HTMLElement) {
+    firstInput.focus();
+  }
+}
+
+function closeAddAssetModal() {
+  ui.addAssetModal.classList.add("hidden");
+  ui.addAssetModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+}
+
+function onModalClick(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  if (target.dataset.closeModal === "true") {
+    closeAddAssetModal();
+  }
+}
+
+function onGlobalKeyDown(event) {
+  if (event.key === "Escape" && !ui.addAssetModal.classList.contains("hidden")) {
+    closeAddAssetModal();
+  }
 }
 
 function onViewControlChange() {
@@ -110,6 +151,7 @@ async function onHoldingAdd(event) {
   persistLocalPortfolio();
 
   ui.holdingForm.reset();
+  closeAddAssetModal();
   snapshotHistory();
   renderAll();
 }

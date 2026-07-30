@@ -202,6 +202,14 @@ h1 {
   font-weight: 600;
 }
 
+button.link-action {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .link-action:hover {
   text-decoration: underline;
 }
@@ -370,6 +378,50 @@ canvas {
 
 .editor-section {
   margin-bottom: 1rem;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(47, 41, 35, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(860px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.modal-form .modal-submit {
+  align-self: end;
+}
+
+body.modal-open {
+  overflow: hidden;
 }
 
 @media (max-width: 1180px) {

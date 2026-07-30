@@ -57,7 +57,7 @@
         <section id="holdingsSection" class="panel holdings-panel">
           <div class="panel-header">
             <h2>Your Holdings</h2>
-            <a class="link-action" href="#assetEditor">Add or Remove Holdings</a>
+            <button id="openAddFromHoldingsBtn" class="link-action" type="button">Add Asset</button>
           </div>
 
           <div class="holding-tools">
@@ -117,47 +117,53 @@
           </article>
         </section>
 
-        <section id="assetEditor" class="cards-two editor-section">
-          <article class="panel">
-            <h2>Add Asset</h2>
-            <form id="holdingForm" class="grid-form">
-              <label>
-                Symbol
-                <input name="ticker" type="text" maxlength="10" required placeholder="AAPL" />
-              </label>
-              <label>
-                Company Name
-                <input name="companyName" type="text" maxlength="80" placeholder="Apple Inc." />
-              </label>
-              <label>
-                Type
-                <select name="assetType" required>
-                  <option value="Stock">Stock</option>
-                  <option value="Bond">Bond</option>
-                  <option value="Cash">Cash</option>
-                  <option value="ETF">ETF</option>
-                  <option value="Crypto">Crypto</option>
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-              <label>
-                Shares
-                <input name="quantity" type="number" min="0" step="0.0001" required placeholder="10" />
-              </label>
-              <label>
-                Cost Basis
-                <input name="avgPrice" type="number" min="0" step="0.01" required placeholder="150" />
-              </label>
-              <label>
-                Current Price
-                <input name="currentPrice" type="number" min="0" step="0.01" placeholder="155" />
-              </label>
-              <button class="btn" type="submit">Add Holding</button>
-            </form>
-          </article>
-        </section>
+        <section id="assetEditor" class="editor-section" aria-hidden="true"></section>
       </section>
     </main>
+  </div>
+
+  <div id="addAssetModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <div class="modal-card panel" role="dialog" aria-modal="true" aria-labelledby="addAssetTitle">
+      <div class="modal-header">
+        <h2 id="addAssetTitle">Add Asset</h2>
+        <button id="closeAddAssetModalBtn" class="btn ghost" type="button" aria-label="Close add asset form">Close</button>
+      </div>
+      <form id="holdingForm" class="grid-form modal-form">
+        <label>
+          Symbol
+          <input name="ticker" type="text" maxlength="10" required placeholder="AAPL" />
+        </label>
+        <label>
+          Company Name
+          <input name="companyName" type="text" maxlength="80" placeholder="Apple Inc." />
+        </label>
+        <label>
+          Type
+          <select name="assetType" required>
+            <option value="Stock">Stock</option>
+            <option value="Bond">Bond</option>
+            <option value="Cash">Cash</option>
+            <option value="ETF">ETF</option>
+            <option value="Crypto">Crypto</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label>
+          Shares
+          <input name="quantity" type="number" min="0" step="0.0001" required placeholder="10" />
+        </label>
+        <label>
+          Cost Basis
+          <input name="avgPrice" type="number" min="0" step="0.01" required placeholder="150" />
+        </label>
+        <label>
+          Current Price
+          <input name="currentPrice" type="number" min="0" step="0.01" placeholder="155" />
+        </label>
+        <button class="btn modal-submit" type="submit">Add Holding</button>
+      </form>
+    </div>
   </div>
 
   <template id="holdingRowTemplate">
