@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <h1>Portfolio Manager</h1>
+      <div class="top-metrics">
+        <div class="metric-pill">
+          <span>Total Portfolio Value:</span>
+          <strong id="headerTotalValue">$0.00</strong>
+        </div>
+        <div class="metric-pill">
+          <span>Total Return:</span>
+          <strong id="headerReturn">+0.0%</strong>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="openAddPanelBtn" class="btn" type="button">+ Add Asset</button>
+        <button id="jumpHoldingsBtn" class="btn ghost" type="button">Remove Asset</button>
+        <button id="refreshPricesBtn" class="btn ghost" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar panel">
+        <nav class="nav-list" aria-label="Main navigation">
+          <a href="#dashboardSection" class="nav-link active">Dashboard</a>
+          <a href="#holdingsSection" class="nav-link">Holdings</a>
+          <a href="#performanceSection" class="nav-link">Performance</a>
+        </nav>
+      </aside>
+
+      <section class="content-area">
+        <section id="dashboardSection" class="cards-two">
+          <article class="panel">
+            <h2>Asset Allocation</h2>
+            <div id="allocationChart" class="allocation"></div>
+            <ul id="allocationLegend" class="legend"></ul>
+          </article>
+
+          <article id="performanceSection" class="panel">
+            <h2>Portfolio Performance</h2>
+            <canvas id="historyChart" width="800" height="320" aria-label="Portfolio trend chart"></canvas>
+            <p class="muted">Snapshots update as holdings change or prices refresh.</p>
+          </article>
+        </section>
+
+        <section id="holdingsSection" class="panel holdings-panel">
+          <div class="panel-header">
+            <h2>Your Holdings</h2>
+            <a class="link-action" href="#assetEditor">Add or Remove Holdings</a>
+          </div>
+
+          <div class="holding-tools">
+            <input id="holdingsSearch" type="search" placeholder="Search by symbol or company" />
+            <select id="holdingsTypeFilter" aria-label="Filter by asset type">
+              <option value="All">All Types</option>
+              <option value="Stock">Stock</option>
+              <option value="Bond">Bond</option>
+              <option value="Cash">Cash</option>
+              <option value="ETF">ETF</option>
+              <option value="Crypto">Crypto</option>
+              <option value="Other">Other</option>
+            </select>
+            <select id="holdingsSort" aria-label="Sort holdings">
+              <option value="valueDesc">Sort: Value high to low</option>
+              <option value="pnlDesc">Sort: P/L high to low</option>
+              <option value="pnlAsc">Sort: P/L low to high</option>
+              <option value="tickerAsc">Sort: Symbol A-Z</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Company Name</th>
+                  <th>Shares</th>
+                  <th>Current Price</th>
+                  <th>Cost Basis</th>
+                  <th>P/L</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="holdingsBody"></tbody>
+            </table>
+          </div>
+          <p id="emptyState" class="muted empty">No holdings to show. Add an asset or change filters.</p>
+        </section>
+
+        <section class="summary-grid">
+          <article class="panel mini-card">
+            <p>Cash Balance</p>
+            <h3 id="cashValue">$0.00</h3>
+          </article>
+          <article class="panel mini-card">
+            <p>Stocks Value</p>
+            <h3 id="stocksValue">$0.00</h3>
+          </article>
+          <article class="panel mini-card">
+            <p>Bonds Value</p>
+            <h3 id="bondsValue">$0.00</h3>
+          </article>
+          <article class="panel mini-card">
+            <p>Crypto Value</p>
+            <h3 id="cryptoValue">$0.00</h3>
+          </article>
+        </section>
+
+        <section id="assetEditor" class="cards-two editor-section">
+          <article class="panel">
+            <h2>Add Asset</h2>
+            <form id="holdingForm" class="grid-form">
+              <label>
+                Symbol
+                <input name="ticker" type="text" maxlength="10" required placeholder="AAPL" />
+              </label>
+              <label>
+                Company Name
+                <input name="companyName" type="text" maxlength="80" placeholder="Apple Inc." />
+              </label>
+              <label>
+                Type
+                <select name="assetType" required>
+                  <option value="Stock">Stock</option>
+                  <option value="Bond">Bond</option>
+                  <option value="Cash">Cash</option>
+                  <option value="ETF">ETF</option>
+                  <option value="Crypto">Crypto</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label>
+                Shares
+                <input name="quantity" type="number" min="0" step="0.0001" required placeholder="10" />
+              </label>
+              <label>
+                Cost Basis
+                <input name="avgPrice" type="number" min="0" step="0.01" required placeholder="150" />
+              </label>
+              <label>
+                Current Price
+                <input name="currentPrice" type="number" min="0" step="0.01" placeholder="155" />
+              </label>
+              <button class="btn" type="submit">Add Holding</button>
+            </form>
+          </article>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <template id="holdingRowTemplate">
+    <tr>
+      <td data-key="ticker"></td>
+      <td data-key="companyName"></td>
+      <td data-key="quantity"></td>
+      <td data-key="currentPrice"></td>
+      <td data-key="avgPrice"></td>
+      <td data-key="pnl"></td>
+      <td><button class="btn danger" data-action="delete" type="button">Remove</button></td>
+    </tr>
+  </template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
