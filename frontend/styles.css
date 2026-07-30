@@ -420,6 +420,22 @@ canvas {
   align-self: end;
 }
 
+.stack-form {
+  display: grid;
+  gap: 0.7rem;
+  max-width: 540px;
+}
+
+.form-note {
+  margin: -0.15rem 0 0.1rem;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 body.modal-open {
   overflow: hidden;
 }

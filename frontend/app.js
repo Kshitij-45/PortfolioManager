@@ -28,6 +28,13 @@ const ui = {
   openAddFromHoldingsBtn: document.getElementById("openAddFromHoldingsBtn"),
   addAssetModal: document.getElementById("addAssetModal"),
   closeAddAssetModalBtn: document.getElementById("closeAddAssetModalBtn"),
+  removeAssetModal: document.getElementById("removeAssetModal"),
+  closeRemoveAssetModalBtn: document.getElementById("closeRemoveAssetModalBtn"),
+  removeHoldingForm: document.getElementById("removeHoldingForm"),
+  removeHoldingSelect: document.getElementById("removeHoldingSelect"),
+  removeHoldingAvailable: document.getElementById("removeHoldingAvailable"),
+  removeQuantityInput: document.getElementById("removeQuantityInput"),
+  removeHoldingSubmit: document.getElementById("removeHoldingSubmit"),
   jumpHoldingsBtn: document.getElementById("jumpHoldingsBtn"),
   holdingsBody: document.getElementById("holdingsBody"),
   rowTemplate: document.getElementById("holdingRowTemplate"),
@@ -67,7 +74,7 @@ function hydrateFromStorage() {
 
 function attachEvents() {
   ui.holdingForm.addEventListener("submit", onHoldingAdd);
-  ui.holdingsBody.addEventListener("click", onHoldingAction);
+  ui.removeHoldingForm.addEventListener("submit", onHoldingRemove);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
   ui.openAddPanelBtn.addEventListener("click", openAddAssetModal);
   if (ui.openAddFromHoldingsBtn) {
@@ -75,9 +82,10 @@ function attachEvents() {
   }
   ui.closeAddAssetModalBtn.addEventListener("click", closeAddAssetModal);
   ui.addAssetModal.addEventListener("click", onModalClick);
-  ui.jumpHoldingsBtn.addEventListener("click", () => {
-    document.getElementById("holdingsSection").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  ui.jumpHoldingsBtn.addEventListener("click", openRemoveAssetModal);
+  ui.closeRemoveAssetModalBtn.addEventListener("click", closeRemoveAssetModal);
+  ui.removeAssetModal.addEventListener("click", onModalClick);
+  ui.removeHoldingSelect.addEventListener("change", onRemoveHoldingSelectChange);
   ui.holdingsSearch.addEventListener("input", onViewControlChange);
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
@@ -85,9 +93,10 @@ function attachEvents() {
 }
 
 function openAddAssetModal() {
+  closeRemoveAssetModal();
   ui.addAssetModal.classList.remove("hidden");
   ui.addAssetModal.setAttribute("aria-hidden", "false");
-  document.body.classList.add("modal-open");
+  updateModalBodyState();
 
   const firstInput = ui.holdingForm.querySelector("input[name=\"ticker\"]");
   if (firstInput instanceof HTMLElement) {
@@ -98,7 +107,32 @@ function openAddAssetModal() {
 function closeAddAssetModal() {
   ui.addAssetModal.classList.add("hidden");
   ui.addAssetModal.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("modal-open");
+  updateModalBodyState();
+}
+
+function openRemoveAssetModal() {
+  closeAddAssetModal();
+  syncRemoveHoldingOptions();
+  ui.removeAssetModal.classList.remove("hidden");
+  ui.removeAssetModal.setAttribute("aria-hidden", "false");
+  updateModalBodyState();
+
+  if (!ui.removeHoldingSelect.disabled) {
+    ui.removeHoldingSelect.focus();
+  }
+}
+
+function closeRemoveAssetModal() {
+  ui.removeAssetModal.classList.add("hidden");
+  ui.removeAssetModal.setAttribute("aria-hidden", "true");
+  ui.removeHoldingForm.reset();
+  updateModalBodyState();
+}
+
+function updateModalBodyState() {
+  const addOpen = !ui.addAssetModal.classList.contains("hidden");
+  const removeOpen = !ui.removeAssetModal.classList.contains("hidden");
+  document.body.classList.toggle("modal-open", addOpen || removeOpen);
 }
 
 function onModalClick(event) {
@@ -115,6 +149,10 @@ function onModalClick(event) {
 function onGlobalKeyDown(event) {
   if (event.key === "Escape" && !ui.addAssetModal.classList.contains("hidden")) {
     closeAddAssetModal();
+  }
+
+  if (event.key === "Escape" && !ui.removeAssetModal.classList.contains("hidden")) {
+    closeRemoveAssetModal();
   }
 }
 
@@ -156,22 +194,77 @@ async function onHoldingAdd(event) {
   renderAll();
 }
 
-async function onHoldingAction(event) {
-  const target = event.target;
-  if (!(target instanceof HTMLElement) || target.dataset.action !== "delete") {
+function onRemoveHoldingSelectChange() {
+  const selectedId = ui.removeHoldingSelect.value;
+  const holding = state.holdings.find((item) => item.id === selectedId);
+
+  if (!holding) {
+    ui.removeHoldingAvailable.textContent = "No holding selected.";
+    ui.removeQuantityInput.value = "";
+    ui.removeQuantityInput.disabled = true;
+    ui.removeHoldingSubmit.disabled = true;
     return;
   }
 
-  const row = target.closest("tr");
-  if (!row || !row.dataset.id) {
+  ui.removeHoldingAvailable.textContent = `Available shares: ${formatNumber(holding.quantity, 4)} (${holding.ticker} - ${holding.companyName})`;
+  ui.removeQuantityInput.disabled = false;
+  ui.removeQuantityInput.max = String(holding.quantity);
+  ui.removeQuantityInput.placeholder = String(Number(holding.quantity.toFixed(4)));
+  ui.removeHoldingSubmit.disabled = false;
+}
+
+function syncRemoveHoldingOptions() {
+  ui.removeHoldingSelect.innerHTML = "";
+
+  if (state.holdings.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No holdings available";
+    ui.removeHoldingSelect.append(option);
+    ui.removeHoldingSelect.disabled = true;
+    ui.removeQuantityInput.disabled = true;
+    ui.removeHoldingSubmit.disabled = true;
+    ui.removeHoldingAvailable.textContent = "Add assets before removing them.";
     return;
   }
 
-  const id = row.dataset.id;
+  const sorted = [...state.holdings].sort((a, b) => a.ticker.localeCompare(b.ticker));
+  for (const holding of sorted) {
+    const option = document.createElement("option");
+    option.value = holding.id;
+    option.textContent = `${holding.ticker} - ${holding.companyName} (${formatNumber(holding.quantity, 4)} shares)`;
+    ui.removeHoldingSelect.append(option);
+  }
 
-  state.holdings = state.holdings.filter((holding) => holding.id !== id);
+  ui.removeHoldingSelect.disabled = false;
+  onRemoveHoldingSelectChange();
+}
+
+async function onHoldingRemove(event) {
+  event.preventDefault();
+
+  const selectedId = ui.removeHoldingSelect.value;
+  const quantityToRemove = Number(ui.removeQuantityInput.value || 0);
+  const holding = state.holdings.find((item) => item.id === selectedId);
+
+  if (!holding || quantityToRemove <= 0) {
+    return;
+  }
+
+  if (quantityToRemove > holding.quantity) {
+    return;
+  }
+
+  const remainingShares = holding.quantity - quantityToRemove;
+  if (remainingShares <= 0.0000001) {
+    state.holdings = state.holdings.filter((item) => item.id !== selectedId);
+  } else {
+    holding.quantity = Number(remainingShares.toFixed(8));
+  }
+
   persistLocalPortfolio();
 
+  closeRemoveAssetModal();
   snapshotHistory();
   renderAll();
 }
@@ -199,6 +292,7 @@ function renderAll() {
   renderTable();
   renderAllocation();
   renderHistoryChart();
+  syncRemoveHoldingOptions();
 }
 
 function renderSummary() {
