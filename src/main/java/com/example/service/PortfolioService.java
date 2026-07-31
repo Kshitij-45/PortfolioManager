@@ -1,5 +1,8 @@
 package com.example.service;
 
+import com.example.Exception.InvalidIdException;
+import com.example.Exception.InvalidPortfolioException;
+import com.example.Exception.PortfolioNotFoundException;
 import com.example.dto.PortfolioDTO;
 import com.example.entity.Portfolio;
 import com.example.repository.PortfolioRepository;
@@ -20,7 +23,7 @@ public class PortfolioService {
 
     public Portfolio createPortfolio(PortfolioDTO portfolioDTO) {
         if (portfolioDTO == null) {
-            throw new IllegalArgumentException("Portfolio cannot be null");
+            throw new InvalidPortfolioException("Portfolio data cannot be null");
         }
         Portfolio portfolio = new Portfolio();
         portfolio.setSymbol(portfolioDTO.getSymbol());
@@ -41,17 +44,17 @@ public class PortfolioService {
     public Portfolio getPortfolioById(Integer id) {
         validateId(id);
         return portfolioRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Portfolio not found with id: " + id));
+                .orElseThrow(() -> new PortfolioNotFoundException(id));
     }
 
     public Portfolio updatePortfolio(Integer id, PortfolioDTO portfolioDTO) {
         validateId(id);
         if (portfolioDTO == null) {
-            throw new IllegalArgumentException("Portfolio cannot be null");
+            throw new InvalidPortfolioException("Portfolio data cannot be null");
         }
 
         if (!portfolioRepository.existsById(id)) {
-            throw new IllegalArgumentException("Portfolio not found with id: " + id);
+            throw new PortfolioNotFoundException(id);
         }
 
         Portfolio portfolio = new Portfolio();
@@ -68,7 +71,7 @@ public class PortfolioService {
     public void deletePortfolio(Integer id) {
         validateId(id);
         if (!portfolioRepository.existsById(id)) {
-            throw new IllegalArgumentException("Portfolio not found with id: " + id);
+            throw new PortfolioNotFoundException(id);
         }
         portfolioRepository.deleteById(id);
     }
@@ -81,7 +84,7 @@ public class PortfolioService {
 
     private void validateId(Integer id) {
         if (id == null || id <= 0) {
-            throw new IllegalArgumentException("Invalid id: " + id);
+            throw new InvalidIdException(id);
         }
     }
 }

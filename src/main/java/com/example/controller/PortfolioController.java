@@ -42,56 +42,36 @@ public class PortfolioController {
 
     // GET portfolio by id
     @GetMapping("/{id}")
-    public ResponseEntity<?> getPortfolioById(@PathVariable Integer id) {
-        try {
-            Portfolio portfolio = portfolioService.getPortfolioById(id);
-            return ResponseEntity.ok(portfolio);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<Portfolio> getPortfolioById(@PathVariable Integer id) {
+        Portfolio portfolio = portfolioService.getPortfolioById(id);
+        return ResponseEntity.ok(portfolio);
     }
 
     // POST create portfolio
     @PostMapping
-    public ResponseEntity<?> createPortfolio(@Valid @RequestBody PortfolioDTO portfolioDTO) {
-        try {
-            Portfolio created = portfolioService.createPortfolio(portfolioDTO);
-            return ResponseEntity.status(HttpStatus.CREATED).body(created);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    public ResponseEntity<Portfolio> createPortfolio(@Valid @RequestBody PortfolioDTO portfolioDTO) {
+        Portfolio created = portfolioService.createPortfolio(portfolioDTO);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     // PUT update portfolio
     @PutMapping("/{id}")
-    public ResponseEntity<?> updatePortfolio(@PathVariable Integer id, @Valid @RequestBody PortfolioDTO portfolioDTO) {
-        try {
-            Portfolio updated = portfolioService.updatePortfolio(id, portfolioDTO);
-            return ResponseEntity.ok(updated);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<Portfolio> updatePortfolio(@PathVariable Integer id, @Valid @RequestBody PortfolioDTO portfolioDTO) {
+        Portfolio updated = portfolioService.updatePortfolio(id, portfolioDTO);
+        return ResponseEntity.ok(updated);
     }
 
     // DELETE portfolio
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePortfolio(@PathVariable Integer id) {
-        try {
-            portfolioService.deletePortfolio(id);
-            return ResponseEntity.ok("Portfolio deleted successfully with id: " + id);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ResponseEntity<String> deletePortfolio(@PathVariable Integer id) {
+        portfolioService.deletePortfolio(id);
+        return ResponseEntity.ok("Portfolio deleted successfully with id: " + id);
     }
 
     // GET check if portfolio exists
     @GetMapping("/{id}/exists")
-    public ResponseEntity<?> existsById(@PathVariable Integer id) {
-        try {
-            boolean exists = portfolioService.existsById(id);
-            return ResponseEntity.ok(exists);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    public ResponseEntity<Boolean> existsById(@PathVariable Integer id) {
+        boolean exists = portfolioService.existsById(id);
+        return ResponseEntity.ok(exists);
     }
 }

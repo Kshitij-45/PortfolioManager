@@ -1,0 +1,8 @@
+package com.example.Exception;
+
+public class InvalidPortfolioException extends RuntimeException {
+
+    public InvalidPortfolioException(String message) {
+        super(message);
+    }
+}
