@@ -19,6 +19,11 @@ public class GlobalException {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(StockNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleStockNotFoundException(StockNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
     @ExceptionHandler(InvalidPortfolioException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidPortfolioException(InvalidPortfolioException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
