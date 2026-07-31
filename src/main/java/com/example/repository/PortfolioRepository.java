@@ -1,42 +1,34 @@
 package com.example.repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+import com.example.mapper.PortfolioRowMapper;
+
 import org.springframework.stereotype.Repository;
 
 import com.example.entity.Portfolio;
 
+
 @Repository
 public class PortfolioRepository {
 
+    // private final JdbcTemplate jdbcTemplate;
+
+    // public PortfolioRepository(JdbcTemplate jdbcTemplate) {
+    //     this.jdbcTemplate = jdbcTemplate;
+    // }
+
     private final JdbcTemplate jdbcTemplate;
+    private final PortfolioRowMapper portfolioRowMapper;
 
-    public PortfolioRepository(JdbcTemplate jdbcTemplate) {
+    public PortfolioRepository(JdbcTemplate jdbcTemplate,
+                           PortfolioRowMapper portfolioRowMapper) {
         this.jdbcTemplate = jdbcTemplate;
+        this.portfolioRowMapper = portfolioRowMapper;
     }
-
-    private final RowMapper<Portfolio> portfolioRowMapper = new RowMapper<Portfolio>() {
-        @Override
-        public Portfolio mapRow(ResultSet rs, int rowNum) throws SQLException {
-
-            Portfolio portfolio = new Portfolio();
-
-            portfolio.setId(rs.getInt("id"));
-            portfolio.setSymbol(rs.getString("symbol"));
-            portfolio.setCompanyName(rs.getString("company_name"));
-            portfolio.setAssetType(rs.getString("asset_type"));
-            portfolio.setQuantity(rs.getInt("quantity"));
-            portfolio.setBuyPrice(rs.getDouble("buy_price"));
-            portfolio.setCurrentPrice(rs.getDouble("current_price"));
-
-            return portfolio;
-        }
-    };
 
     // Get All Assets
     public List<Portfolio> findAll() {

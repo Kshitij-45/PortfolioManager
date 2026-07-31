@@ -1,7 +1,11 @@
 package com.example.controller;
 
+import com.example.dto.PortfolioDTO;
 import com.example.entity.Portfolio;
 import com.example.service.PortfolioService;
+
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -45,9 +49,9 @@ public class PortfolioController {
 
     // POST create portfolio
     @PostMapping
-    public ResponseEntity<?> createPortfolio(@RequestBody Portfolio portfolio) {
+    public ResponseEntity<?> createPortfolio(@Valid @RequestBody PortfolioDTO portfolioDTO) {
         try {
-            Portfolio created = portfolioService.createPortfolio(portfolio);
+            Portfolio created = portfolioService.createPortfolio(portfolioDTO);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
@@ -56,9 +60,9 @@ public class PortfolioController {
 
     // PUT update portfolio
     @PutMapping("/{id}")
-    public ResponseEntity<?> updatePortfolio(@PathVariable Integer id, @RequestBody Portfolio portfolio) {
+    public ResponseEntity<?> updatePortfolio(@PathVariable Integer id, @Valid @RequestBody PortfolioDTO portfolioDTO) {
         try {
-            Portfolio updated = portfolioService.updatePortfolio(id, portfolio);
+            Portfolio updated = portfolioService.updatePortfolio(id, portfolioDTO);
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());

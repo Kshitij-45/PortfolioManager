@@ -1,5 +1,5 @@
-package com.example.controller;
+// package com.example.controller;
 
-public class StockController {
+// public class StockController {
 
-}
+// }

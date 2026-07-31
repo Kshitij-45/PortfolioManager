@@ -1,5 +1,6 @@
 package com.example.service;
 
+import com.example.dto.PortfolioDTO;
 import com.example.entity.Portfolio;
 import com.example.repository.PortfolioRepository;
 import org.springframework.stereotype.Service;
@@ -17,10 +18,17 @@ public class PortfolioService {
         this.portfolioRepository = portfolioRepository;
     }
 
-    public Portfolio createPortfolio(Portfolio portfolio) {
-        if (portfolio == null) {
+    public Portfolio createPortfolio(PortfolioDTO portfolioDTO) {
+        if (portfolioDTO == null) {
             throw new IllegalArgumentException("Portfolio cannot be null");
         }
+        Portfolio portfolio = new Portfolio();
+        portfolio.setSymbol(portfolioDTO.getSymbol());
+        portfolio.setCompanyName(portfolioDTO.getCompanyName());
+        portfolio.setAssetType(portfolioDTO.getAssetType());
+        portfolio.setQuantity(portfolioDTO.getQuantity());
+        portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
+        portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
         return portfolioRepository.save(portfolio);
     }
 
@@ -36,9 +44,9 @@ public class PortfolioService {
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found with id: " + id));
     }
 
-    public Portfolio updatePortfolio(Integer id, Portfolio portfolio) {
+    public Portfolio updatePortfolio(Integer id, PortfolioDTO portfolioDTO) {
         validateId(id);
-        if (portfolio == null) {
+        if (portfolioDTO == null) {
             throw new IllegalArgumentException("Portfolio cannot be null");
         }
 
@@ -46,7 +54,14 @@ public class PortfolioService {
             throw new IllegalArgumentException("Portfolio not found with id: " + id);
         }
 
+        Portfolio portfolio = new Portfolio();
         portfolio.setId(id);
+        portfolio.setSymbol(portfolioDTO.getSymbol());
+        portfolio.setCompanyName(portfolioDTO.getCompanyName());
+        portfolio.setAssetType(portfolioDTO.getAssetType());
+        portfolio.setQuantity(portfolioDTO.getQuantity());
+        portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
+        portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
         return portfolioRepository.save(portfolio);
     }
 
