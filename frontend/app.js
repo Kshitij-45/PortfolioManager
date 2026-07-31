@@ -23,6 +23,7 @@ const state = {
 };
 
 const ui = {
+  navLinks: Array.from(document.querySelectorAll(".nav-link")),
   holdingForm: document.getElementById("holdingForm"),
   openAddPanelBtn: document.getElementById("openAddPanelBtn"),
   openAddFromHoldingsBtn: document.getElementById("openAddFromHoldingsBtn"),
@@ -73,6 +74,10 @@ function hydrateFromStorage() {
 }
 
 function attachEvents() {
+  for (const link of ui.navLinks) {
+    link.addEventListener("click", onSidebarNavClick);
+  }
+
   ui.holdingForm.addEventListener("submit", onHoldingAdd);
   ui.removeHoldingForm.addEventListener("submit", onHoldingRemove);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
@@ -90,6 +95,30 @@ function attachEvents() {
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
   document.addEventListener("keydown", onGlobalKeyDown);
+  window.addEventListener("hashchange", syncActiveNavFromHash);
+
+  syncActiveNavFromHash();
+}
+
+function onSidebarNavClick(event) {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLAnchorElement)) {
+    return;
+  }
+
+  setActiveNav(target.getAttribute("href") || "");
+}
+
+function syncActiveNavFromHash() {
+  const currentHash = window.location.hash || "#dashboardSection";
+  setActiveNav(currentHash);
+}
+
+function setActiveNav(hash) {
+  for (const link of ui.navLinks) {
+    const href = link.getAttribute("href") || "";
+    link.classList.toggle("active", href === hash);
+  }
 }
 
 function openAddAssetModal() {
