@@ -1,14 +1,7 @@
 package com.example.entity;
 
-import jakarta.persistence.*;
-
-
-@Entity
-@Table(name = "portfolio")
 public class Portfolio {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     private String symbol;
