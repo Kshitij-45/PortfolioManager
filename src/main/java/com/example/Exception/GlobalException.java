@@ -24,6 +24,11 @@ public class GlobalException {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(StockServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleStockServiceException(StockServiceException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(InvalidPortfolioException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidPortfolioException(InvalidPortfolioException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
