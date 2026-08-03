@@ -1,8 +1,7 @@
 package com.example.service;
 
-import com.example.Exception.StockNotFoundException;
-import com.example.Exception.StockServiceException;
-import com.example.dto.StockQuoteDTO;
+import com.example.Exception.AssetNotFoundException;
+import com.example.dto.CryptoQuoteDTO;
 import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -12,73 +11,67 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-public class StockService extends BaseMarketDataService {
+public class CryptoService extends BaseMarketDataService {
 
-    public StockService(RestTemplate restTemplate) {
+    public CryptoService(RestTemplate restTemplate) {
         super(restTemplate);
     }
 
     /**
-     * Get a full quote for a single stock symbol (e.g. "AAPL", "TSLA").
+     * Get a full quote for a crypto symbol.
+     * Use Yahoo Finance format: BTC-USD, ETH-USD, SOL-USD, BNB-USD, etc.
      */
-    public StockQuoteDTO getQuote(String symbol) {
+    public CryptoQuoteDTO getQuote(String symbol) {
         String upperSymbol = symbol.trim().toUpperCase();
         JsonNode meta = fetchChartMeta(upperSymbol);
         if (meta == null || meta.isMissingNode()) {
-            throw new StockNotFoundException(upperSymbol);
+            throw new AssetNotFoundException("Crypto", upperSymbol);
         }
-        return mapMetaToDTO(meta);
+        return mapToDTO(meta);
     }
 
     /**
-     * Get the current price only for a symbol.
+     * Get current price only for a crypto symbol.
      */
     public BigDecimal getCurrentPrice(String symbol) {
         return getQuote(symbol).getCurrentPrice();
     }
 
     /**
-     * Get quotes for multiple symbols at once.
+     * Get quotes for multiple crypto symbols.
      */
-    public List<StockQuoteDTO> getQuotes(List<String> symbols) {
-        List<StockQuoteDTO> results = new ArrayList<>();
+    public List<CryptoQuoteDTO> getQuotes(List<String> symbols) {
+        List<CryptoQuoteDTO> results = new ArrayList<>();
         for (String symbol : symbols) {
             try {
                 results.add(getQuote(symbol));
-            } catch (StockNotFoundException ignored) {
+            } catch (AssetNotFoundException ignored) {
                 // skip invalid symbols in batch
             }
         }
         return results;
     }
 
-    private StockQuoteDTO mapMetaToDTO(JsonNode meta) {
+    private CryptoQuoteDTO mapToDTO(JsonNode meta) {
         BigDecimal price     = decimalOrNull(meta, "regularMarketPrice");
         BigDecimal prevClose = decimalOrNull(meta, "chartPreviousClose");
         BigDecimal change    = computeChange(price, prevClose);
         BigDecimal changePct = computeChangePercent(change, prevClose);
 
-        return StockQuoteDTO.builder()
+        return CryptoQuoteDTO.builder()
                 .symbol(textOrNull(meta, "symbol"))
-                .companyName(textOrNull(meta, "longName") != null
+                .name(textOrNull(meta, "longName") != null
                         ? textOrNull(meta, "longName") : textOrNull(meta, "shortName"))
-                .exchange(textOrNull(meta, "fullExchangeName"))
                 .currency(textOrNull(meta, "currency"))
                 .currentPrice(price)
                 .previousClose(prevClose)
-                .open(decimalOrNull(meta, "regularMarketOpen"))
-                .dayHigh(decimalOrNull(meta, "regularMarketDayHigh"))
-                .dayLow(decimalOrNull(meta, "regularMarketDayLow"))
                 .priceChange(change)
                 .priceChangePercent(changePct)
+                .dayHigh(decimalOrNull(meta, "regularMarketDayHigh"))
+                .dayLow(decimalOrNull(meta, "regularMarketDayLow"))
                 .volume(longOrNull(meta, "regularMarketVolume"))
-                .avgVolume(null)
                 .fiftyTwoWeekHigh(decimalOrNull(meta, "fiftyTwoWeekHigh"))
                 .fiftyTwoWeekLow(decimalOrNull(meta, "fiftyTwoWeekLow"))
-                .marketCap(null)
-                .peRatio(null)
-                .eps(null)
-                .dividendYield(null)
                 .build();
     }
 }
