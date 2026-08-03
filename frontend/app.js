@@ -273,7 +273,8 @@ async function onHoldingAdd(event) {
     assetType: String(formData.get("assetType") || "Other"),
     quantity: Number(formData.get("quantity") || 0),
     avgPrice: Number(formData.get("avgPrice") || 0),
-    currentPrice: Number(formData.get("currentPrice") || formData.get("avgPrice") || 0)
+    currentPrice: Number(formData.get("currentPrice") || formData.get("avgPrice") || 0),
+    purchaseDate: String(formData.get("purchaseDate") || "")
   };
 
   if (!holding.companyName) {
@@ -472,6 +473,7 @@ function renderTable() {
     setCell(clone, "quantity", formatNumber(holding.quantity, 4));
     setCell(clone, "avgPrice", formatCurrency(holding.avgPrice));
     setCell(clone, "currentPrice", formatCurrency(holding.currentPrice));
+    setCell(clone, "purchaseDate", holding.purchaseDate ? formatDate(holding.purchaseDate) : "—");
 
     const pnlCell = setCell(clone, "pnl", formatCurrency(pnl));
     pnlCell.classList.add(pnl >= 0 ? "positive" : "negative");
@@ -704,13 +706,13 @@ function normalizeHolding(raw) {
 function seedDemoData() {
   state.balance = 15000;
   state.holdings = [
-    { id: crypto.randomUUID(), ticker: "AAPL", companyName: "Apple Inc.", assetType: "Stock", quantity: 35, avgPrice: 120, currentPrice: 145.32 },
-    { id: crypto.randomUUID(), ticker: "TSLA", companyName: "Tesla Inc.", assetType: "Stock", quantity: 20, avgPrice: 650, currentPrice: 720.15 },
-    { id: crypto.randomUUID(), ticker: "AMZN", companyName: "Amazon.com Inc.", assetType: "Stock", quantity: 10, avgPrice: 3100, currentPrice: 3340.5 },
-    { id: crypto.randomUUID(), ticker: "GOOGL", companyName: "Alphabet Inc.", assetType: "Stock", quantity: 8, avgPrice: 2500, currentPrice: 2750.75 },
-    { id: crypto.randomUUID(), ticker: "BND", companyName: "Vanguard Total Bond", assetType: "Bond", quantity: 25, avgPrice: 68.4, currentPrice: 71.1 },
-    { id: crypto.randomUUID(), ticker: "BTC", companyName: "Bitcoin", assetType: "Crypto", quantity: 0.18, avgPrice: 52000, currentPrice: 61000 },
-    { id: crypto.randomUUID(), ticker: "CASH", companyName: "Cash Reserve", assetType: "Cash", quantity: 1, avgPrice: 5200, currentPrice: 5200 }
+    { id: crypto.randomUUID(), ticker: "AAPL", companyName: "Apple Inc.", assetType: "Stock", quantity: 35, avgPrice: 120, currentPrice: 145.32, purchaseDate: "2023-03-15" },
+    { id: crypto.randomUUID(), ticker: "TSLA", companyName: "Tesla Inc.", assetType: "Stock", quantity: 20, avgPrice: 650, currentPrice: 720.15, purchaseDate: "2022-11-20" },
+    { id: crypto.randomUUID(), ticker: "AMZN", companyName: "Amazon.com Inc.", assetType: "Stock", quantity: 10, avgPrice: 3100, currentPrice: 3340.5, purchaseDate: "2021-06-10" },
+    { id: crypto.randomUUID(), ticker: "GOOGL", companyName: "Alphabet Inc.", assetType: "Stock", quantity: 8, avgPrice: 2500, currentPrice: 2750.75, purchaseDate: "2022-01-05" },
+    { id: crypto.randomUUID(), ticker: "BND", companyName: "Vanguard Total Bond", assetType: "Bond", quantity: 25, avgPrice: 68.4, currentPrice: 71.1, purchaseDate: "2023-07-22" },
+    { id: crypto.randomUUID(), ticker: "BTC", companyName: "Bitcoin", assetType: "Crypto", quantity: 0.18, avgPrice: 52000, currentPrice: 61000, purchaseDate: "2024-01-30" },
+    { id: crypto.randomUUID(), ticker: "CASH", companyName: "Cash Reserve", assetType: "Cash", quantity: 1, avgPrice: 5200, currentPrice: 5200, purchaseDate: "2023-01-01" }
   ];
 
   persistLocalPortfolio();
@@ -787,4 +789,11 @@ function formatNumber(value, decimals = 2) {
 function formatSignedPercent(value) {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "\u2014";
+  const date = new Date(dateStr + "T00:00:00");
+  if (isNaN(date.getTime())) return dateStr;
+  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(date);
 }

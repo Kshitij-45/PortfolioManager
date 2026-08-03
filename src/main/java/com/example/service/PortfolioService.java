@@ -46,6 +46,7 @@ public class PortfolioService {
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
+        portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
         Portfolio saved = portfolioRepository.save(portfolio);
         saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return saved;
@@ -96,6 +97,7 @@ public class PortfolioService {
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
+        portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
         Portfolio saved = portfolioRepository.save(portfolio);
         saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return saved;

@@ -1,5 +1,6 @@
 package com.example.entity;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 public class Portfolio {
 
     private Integer id;
@@ -17,6 +18,8 @@ public class Portfolio {
     private Double currentPrice;
 
     private BigDecimal availableBalance;
+
+    private LocalDate purchaseDate;
 
     public Integer getId() {
         return id;
@@ -80,6 +83,14 @@ public class Portfolio {
 
     public void setAvailableBalance(BigDecimal availableBalance) {
         this.availableBalance = availableBalance;
+    }
+
+    public LocalDate getPurchaseDate() {
+        return purchaseDate;
+    }
+
+    public void setPurchaseDate(LocalDate purchaseDate) {
+        this.purchaseDate = purchaseDate;
     }
 
     

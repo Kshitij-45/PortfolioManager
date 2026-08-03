@@ -40,7 +40,8 @@ public class PortfolioRepository {
                        asset_type,
                        quantity,
                        buy_price,
-                       current_price
+                       current_price,
+                       purchase_date
                 FROM portfolio
                 """;
 
@@ -57,7 +58,8 @@ public class PortfolioRepository {
                        asset_type,
                        quantity,
                        buy_price,
-                       current_price
+                       current_price,
+                       purchase_date
                 FROM portfolio
                 WHERE id = ?
                 """;
@@ -74,8 +76,8 @@ public class PortfolioRepository {
 
             String insertSql = """
                     INSERT INTO portfolio
-                    (symbol, company_name, asset_type, quantity, buy_price, current_price)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (symbol, company_name, asset_type, quantity, buy_price, current_price, purchase_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """;
 
             jdbcTemplate.update(
@@ -85,7 +87,8 @@ public class PortfolioRepository {
                     portfolio.getAssetType(),
                     portfolio.getQuantity(),
                     portfolio.getBuyPrice(),
-                    portfolio.getCurrentPrice());
+                    portfolio.getCurrentPrice(),
+                    portfolio.getPurchaseDate());
 
             Integer generatedId = jdbcTemplate.queryForObject(
                     "SELECT LAST_INSERT_ID()",
@@ -102,7 +105,8 @@ public class PortfolioRepository {
                         asset_type = ?,
                         quantity = ?,
                         buy_price = ?,
-                        current_price = ?
+                        current_price = ?,
+                        purchase_date = ?
                     WHERE id = ?
                     """;
 
@@ -114,6 +118,7 @@ public class PortfolioRepository {
                     portfolio.getQuantity(),
                     portfolio.getBuyPrice(),
                     portfolio.getCurrentPrice(),
+                    portfolio.getPurchaseDate(),
                     portfolio.getId());
         }
 
