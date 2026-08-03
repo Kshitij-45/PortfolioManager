@@ -1,0 +1,6 @@
+#FileLock
+#Mon Aug 03 08:25:20 UTC 2026
+hostName=10.18.76.234
+id=19fc6ba2d48fee2dad80b2cc74ca58394b8fde35b11
+method=file
+server=10.18.76.234\:60765

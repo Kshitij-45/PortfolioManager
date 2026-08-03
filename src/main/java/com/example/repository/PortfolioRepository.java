@@ -28,6 +28,22 @@ public class PortfolioRepository {
                            PortfolioRowMapper portfolioRowMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.portfolioRowMapper = portfolioRowMapper;
+        ensureTableExists();
+    }
+
+    private void ensureTableExists() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    symbol VARCHAR(20) NOT NULL,
+                    company_name VARCHAR(120) NOT NULL,
+                    asset_type VARCHAR(40) NOT NULL,
+                    quantity INT NOT NULL,
+                    buy_price DECIMAL(19,4) NOT NULL,
+                    current_price DECIMAL(19,4) NOT NULL,
+                    purchase_date DATE NOT NULL
+                )
+                """);
     }
 
     // Get All Assets

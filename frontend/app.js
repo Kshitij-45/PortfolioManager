@@ -1,22 +1,27 @@
-const STORAGE_KEYS = {
-  holdings: "pm_holdings",
-  history: "pm_history",
-  balance: "pm_balance"
-};
+function resolveApiBase() {
+  if (window.PORTFOLIO_API_BASE) {
+    return String(window.PORTFOLIO_API_BASE).replace(/\/$/, "");
+  }
 
-const COLORS = [
-  "#7a5b36",
-  "#a67c52",
-  "#c79d6d",
-  "#5f6f52",
-  "#8c5a44",
-  "#bba07a"
-];
+  const isHttp = window.location.protocol.startsWith("http");
+  const isSpringPort = window.location.port === "8080";
+
+  if (isHttp && isSpringPort) {
+    return window.location.origin;
+  }
+
+  const host = window.location.hostname || "localhost";
+  return `http://${host}:8080`;
+}
+
+const API_BASE = resolveApiBase();
+
+const COLORS = ["#7a5b36", "#a67c52", "#c79d6d", "#5f6f52", "#8c5a44", "#bba07a"];
 
 const state = {
   holdings: [],
   history: [],
-  balance: 10000,
+  balance: 0,
   view: {
     search: "",
     type: "All",
@@ -69,23 +74,10 @@ const ui = {
 init();
 
 async function init() {
-  hydrateFromStorage();
   attachEvents();
-
-  if (state.holdings.length === 0) {
-    seedDemoData();
-  }
-
-  renderAll();
-}
-
-function hydrateFromStorage() {
-  state.holdings = parseJson(localStorage.getItem(STORAGE_KEYS.holdings), []);
-  state.history = parseJson(localStorage.getItem(STORAGE_KEYS.history), []);
-  state.balance = Number(localStorage.getItem(STORAGE_KEYS.balance));
-  if (!Number.isFinite(state.balance) || state.balance < 0) {
-    state.balance = 10000;
-  }
+  ui.removeQuantityInput.step = "1";
+  ui.removeQuantityInput.min = "1";
+  await refreshPortfolioState(false);
 }
 
 function attachEvents() {
@@ -97,26 +89,71 @@ function attachEvents() {
   ui.addMoneyForm.addEventListener("submit", onAddMoneySubmit);
   ui.closeAddMoneyModalBtn.addEventListener("click", closeAddMoneyModal);
   ui.addMoneyModal.addEventListener("click", onModalClick);
+
   ui.holdingForm.addEventListener("submit", onHoldingAdd);
   ui.removeHoldingForm.addEventListener("submit", onHoldingRemove);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
+
   ui.openAddPanelBtn.addEventListener("click", openAddAssetModal);
   if (ui.openAddFromHoldingsBtn) {
     ui.openAddFromHoldingsBtn.addEventListener("click", openAddAssetModal);
   }
+
   ui.closeAddAssetModalBtn.addEventListener("click", closeAddAssetModal);
   ui.addAssetModal.addEventListener("click", onModalClick);
+
   ui.jumpHoldingsBtn.addEventListener("click", openRemoveAssetModal);
   ui.closeRemoveAssetModalBtn.addEventListener("click", closeRemoveAssetModal);
   ui.removeAssetModal.addEventListener("click", onModalClick);
   ui.removeHoldingSelect.addEventListener("change", onRemoveHoldingSelectChange);
+
   ui.holdingsSearch.addEventListener("input", onViewControlChange);
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
+
   document.addEventListener("keydown", onGlobalKeyDown);
   window.addEventListener("hashchange", syncActiveNavFromHash);
 
   syncActiveNavFromHash();
+}
+
+async function refreshPortfolioState(addSnapshot = true) {
+  try {
+    const [portfoliosResponse, balanceResponse] = await Promise.all([
+      fetch(`${API_BASE}/api/portfolios`),
+      fetch(`${API_BASE}/api/balance`)
+    ]);
+
+    if (!portfoliosResponse.ok) {
+      throw new Error(await readApiError(portfoliosResponse));
+    }
+
+    if (!balanceResponse.ok) {
+      throw new Error(await readApiError(balanceResponse));
+    }
+
+    const portfolios = await portfoliosResponse.json();
+    const balance = await balanceResponse.json();
+
+    state.holdings = Array.isArray(portfolios)
+      ? portfolios.map(normalizeHolding).filter(Boolean)
+      : [];
+    state.balance = Number(balance && balance.availableBalance);
+    if (!Number.isFinite(state.balance) || state.balance < 0) {
+      state.balance = 0;
+    }
+
+    if (addSnapshot) {
+      snapshotHistory();
+    }
+
+    renderAll();
+  } catch (error) {
+    setHoldingFormError(`Unable to load backend data: ${error.message}`);
+    state.holdings = [];
+    state.balance = 0;
+    renderAll();
+  }
 }
 
 function onSidebarNavClick(event) {
@@ -124,7 +161,6 @@ function onSidebarNavClick(event) {
   if (!(target instanceof HTMLAnchorElement)) {
     return;
   }
-
   setActiveNav(target.getAttribute("href") || "");
 }
 
@@ -143,11 +179,12 @@ function setActiveNav(hash) {
 function openAddAssetModal() {
   closeAddMoneyModal();
   closeRemoveAssetModal();
+  clearHoldingFormError();
   ui.addAssetModal.classList.remove("hidden");
   ui.addAssetModal.setAttribute("aria-hidden", "false");
   updateModalBodyState();
 
-  const firstInput = ui.holdingForm.querySelector("input[name=\"ticker\"]");
+  const firstInput = ui.holdingForm.querySelector('input[name="ticker"]');
   if (firstInput instanceof HTMLElement) {
     firstInput.focus();
   }
@@ -186,7 +223,6 @@ function openAddMoneyModal() {
   ui.addMoneyModal.classList.remove("hidden");
   ui.addMoneyModal.setAttribute("aria-hidden", "false");
   updateModalBodyState();
-
   ui.addMoneyAmountInput.focus();
 }
 
@@ -237,7 +273,7 @@ function onGlobalKeyDown(event) {
   }
 }
 
-function onAddMoneySubmit(event) {
+async function onAddMoneySubmit(event) {
   event.preventDefault();
   clearAddMoneyFormError();
 
@@ -247,10 +283,28 @@ function onAddMoneySubmit(event) {
     return;
   }
 
-  state.balance = Number((state.balance + amount).toFixed(2));
-  persistLocalPortfolio();
-  renderSummary();
-  closeAddMoneyModal();
+  try {
+    const response = await fetch(`${API_BASE}/api/balance/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount })
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+
+    const payload = await response.json();
+    state.balance = Number(payload.availableBalance || state.balance);
+    if (!Number.isFinite(state.balance) || state.balance < 0) {
+      state.balance = 0;
+    }
+
+    renderSummary();
+    closeAddMoneyModal();
+  } catch (error) {
+    setAddMoneyFormError(error.message);
+  }
 }
 
 function onViewControlChange() {
@@ -266,49 +320,59 @@ async function onHoldingAdd(event) {
 
   const formData = new FormData(ui.holdingForm);
 
-  const holding = {
-    id: crypto.randomUUID(),
-    ticker: String(formData.get("ticker") || "").trim().toUpperCase(),
-    companyName: String(formData.get("companyName") || "").trim(),
-    assetType: String(formData.get("assetType") || "Other"),
-    quantity: Number(formData.get("quantity") || 0),
-    avgPrice: Number(formData.get("avgPrice") || 0),
-    currentPrice: Number(formData.get("currentPrice") || formData.get("avgPrice") || 0),
-    purchaseDate: String(formData.get("purchaseDate") || "")
-  };
+  const ticker = String(formData.get("ticker") || "").trim().toUpperCase();
+  const companyName = String(formData.get("companyName") || "").trim() || inferCompanyName(ticker);
+  const assetType = normalizeAssetType(String(formData.get("assetType") || "Other"));
+  const quantity = Number.parseInt(String(formData.get("quantity") || "0"), 10);
+  const avgPrice = Number(formData.get("avgPrice") || 0);
+  const currentPriceInput = Number(formData.get("currentPrice") || 0);
+  const currentPrice = currentPriceInput > 0 ? currentPriceInput : avgPrice;
+  const purchaseDate = String(formData.get("purchaseDate") || "");
 
-  if (!holding.companyName) {
-    holding.companyName = inferCompanyName(holding.ticker);
-  }
-
-  if (!holding.ticker || holding.quantity <= 0 || holding.avgPrice < 0 || holding.currentPrice < 0) {
-    setHoldingFormError("Enter valid symbol, quantity, and prices.");
+  if (!ticker || !companyName || !purchaseDate) {
+    setHoldingFormError("Symbol, company name, and purchase date are required.");
     return;
   }
 
-  const buyCost = holding.quantity * holding.avgPrice;
-  if (holding.assetType === "Stock" && buyCost > state.balance) {
-    setHoldingFormError(
-      `Insufficient balance. Available ${formatCurrency(state.balance)}, required ${formatCurrency(buyCost)}.`
-    );
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    setHoldingFormError("Quantity must be a whole number greater than 0.");
     return;
   }
 
-  if (holding.assetType === "Stock") {
-    state.balance = Number((state.balance - buyCost).toFixed(2));
+  if (!Number.isFinite(avgPrice) || avgPrice <= 0 || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+    setHoldingFormError("Buy price and current price must be greater than 0.");
+    return;
   }
 
-  state.holdings.push(holding);
-  persistLocalPortfolio();
+  try {
+    const response = await fetch(`${API_BASE}/api/portfolios`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: ticker,
+        companyName,
+        assetType,
+        quantity,
+        buyPrice: avgPrice,
+        currentPrice,
+        purchaseDate
+      })
+    });
 
-  ui.holdingForm.reset();
-  closeAddAssetModal();
-  snapshotHistory();
-  renderAll();
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+
+    ui.holdingForm.reset();
+    closeAddAssetModal();
+    await refreshPortfolioState();
+  } catch (error) {
+    setHoldingFormError(error.message);
+  }
 }
 
 function onRemoveHoldingSelectChange() {
-  const selectedId = ui.removeHoldingSelect.value;
+  const selectedId = Number(ui.removeHoldingSelect.value);
   const holding = state.holdings.find((item) => item.id === selectedId);
 
   if (!holding) {
@@ -319,10 +383,10 @@ function onRemoveHoldingSelectChange() {
     return;
   }
 
-  ui.removeHoldingAvailable.textContent = `Available shares: ${formatNumber(holding.quantity, 4)} (${holding.ticker} - ${holding.companyName})`;
+  ui.removeHoldingAvailable.textContent = `Available shares: ${formatNumber(holding.quantity, 0)} (${holding.ticker} - ${holding.companyName})`;
   ui.removeQuantityInput.disabled = false;
   ui.removeQuantityInput.max = String(holding.quantity);
-  ui.removeQuantityInput.placeholder = String(Number(holding.quantity.toFixed(4)));
+  ui.removeQuantityInput.placeholder = String(holding.quantity);
   ui.removeHoldingSubmit.disabled = false;
 }
 
@@ -344,8 +408,8 @@ function syncRemoveHoldingOptions() {
   const sorted = [...state.holdings].sort((a, b) => a.ticker.localeCompare(b.ticker));
   for (const holding of sorted) {
     const option = document.createElement("option");
-    option.value = holding.id;
-    option.textContent = `${holding.ticker} - ${holding.companyName} (${formatNumber(holding.quantity, 4)} shares)`;
+    option.value = String(holding.id);
+    option.textContent = `${holding.ticker} - ${holding.companyName} (${formatNumber(holding.quantity, 0)} shares)`;
     ui.removeHoldingSelect.append(option);
   }
 
@@ -356,11 +420,11 @@ function syncRemoveHoldingOptions() {
 async function onHoldingRemove(event) {
   event.preventDefault();
 
-  const selectedId = ui.removeHoldingSelect.value;
-  const quantityToRemove = Number(ui.removeQuantityInput.value || 0);
+  const selectedId = Number(ui.removeHoldingSelect.value);
+  const quantityToRemove = Number.parseInt(ui.removeQuantityInput.value || "0", 10);
   const holding = state.holdings.find((item) => item.id === selectedId);
 
-  if (!holding || quantityToRemove <= 0) {
+  if (!holding || !Number.isInteger(quantityToRemove) || quantityToRemove <= 0) {
     return;
   }
 
@@ -368,23 +432,34 @@ async function onHoldingRemove(event) {
     return;
   }
 
-  const remainingShares = holding.quantity - quantityToRemove;
-  if (remainingShares <= 0.0000001) {
-    state.holdings = state.holdings.filter((item) => item.id !== selectedId);
-  } else {
-    holding.quantity = Number(remainingShares.toFixed(8));
+  try {
+    if (quantityToRemove === holding.quantity) {
+      const response = await fetch(`${API_BASE}/api/portfolios/${holding.id}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+    } else {
+      const response = await fetch(`${API_BASE}/api/portfolios/${holding.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPortfolioPayload(holding, {
+          quantity: holding.quantity - quantityToRemove
+        }))
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+    }
+
+    closeRemoveAssetModal();
+    await refreshPortfolioState();
+  } catch (error) {
+    ui.removeHoldingAvailable.textContent = error.message;
   }
-
-  if (holding.assetType === "Stock") {
-    const creditedAmount = quantityToRemove * holding.avgPrice;
-    state.balance = Number((state.balance + creditedAmount).toFixed(2));
-  }
-
-  persistLocalPortfolio();
-
-  closeRemoveAssetModal();
-  snapshotHistory();
-  renderAll();
 }
 
 async function onRefreshPrices() {
@@ -392,17 +467,95 @@ async function onRefreshPrices() {
     return;
   }
 
-  for (const holding of state.holdings) {
-    const updatedPrice = await fetchSamplePrice(holding.ticker);
-    if (updatedPrice > 0) {
-      holding.currentPrice = updatedPrice;
+  ui.refreshPricesBtn.disabled = true;
+  ui.refreshPricesBtn.textContent = "Refreshing...";
+
+  try {
+    let changed = false;
+    for (const holding of state.holdings) {
+      try {
+        const nextPrice = await fetchPriceForHolding(holding);
+        if (!Number.isFinite(nextPrice) || nextPrice <= 0 || nextPrice === holding.currentPrice) {
+          continue;
+        }
+
+        const response = await fetch(`${API_BASE}/api/portfolios/${holding.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildPortfolioPayload(holding, { currentPrice: nextPrice }))
+        });
+
+        if (!response.ok) {
+          continue;
+        }
+
+        changed = true;
+      } catch {
+        // Skip symbols that fail price lookup/update so one bad symbol doesn't block refresh.
+        continue;
+      }
     }
+
+    if (changed) {
+      await refreshPortfolioState();
+    } else {
+      renderAll();
+    }
+  } catch (error) {
+    setHoldingFormError(`Price refresh failed: ${error.message}`);
+  } finally {
+    ui.refreshPricesBtn.disabled = false;
+    ui.refreshPricesBtn.textContent = "Refresh";
+  }
+}
+
+async function fetchPriceForHolding(holding) {
+  const symbol = toMarketSymbol(holding);
+  const type = (holding.assetType || "").toLowerCase();
+
+  if (type === "cash") {
+    return holding.currentPrice;
   }
 
-  persistLocalPortfolio();
+  let endpoint = "";
+  if (type === "bond") {
+    endpoint = `/api/bonds/${encodeURIComponent(symbol)}/price`;
+  } else if (type === "crypto") {
+    endpoint = `/api/crypto/${encodeURIComponent(symbol)}/price`;
+  } else if (type === "mutual fund") {
+    endpoint = `/api/funds/${encodeURIComponent(symbol)}/nav`;
+  } else {
+    endpoint = `/api/stocks/${encodeURIComponent(symbol)}/price`;
+  }
 
-  snapshotHistory();
-  renderAll();
+  const response = await fetch(`${API_BASE}${endpoint}`);
+  if (!response.ok) {
+    return holding.currentPrice;
+  }
+
+  const payload = await response.json();
+  const price = Number(payload);
+  return Number.isFinite(price) && price > 0 ? price : holding.currentPrice;
+}
+
+function toMarketSymbol(holding) {
+  if ((holding.assetType || "").toLowerCase() !== "crypto") {
+    return holding.ticker;
+  }
+
+  return holding.ticker.includes("-") ? holding.ticker : `${holding.ticker}-USD`;
+}
+
+function buildPortfolioPayload(holding, overrides = {}) {
+  return {
+    symbol: holding.ticker,
+    companyName: holding.companyName,
+    assetType: holding.assetType,
+    quantity: Number.isInteger(overrides.quantity) ? overrides.quantity : holding.quantity,
+    buyPrice: Number.isFinite(overrides.avgPrice) ? overrides.avgPrice : holding.avgPrice,
+    currentPrice: Number.isFinite(overrides.currentPrice) ? overrides.currentPrice : holding.currentPrice,
+    purchaseDate: holding.purchaseDate
+  };
 }
 
 function renderAll() {
@@ -419,17 +572,17 @@ function renderSummary() {
   const pnl = totalValue - totalCost;
   const returnPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
-  const byType = { Cash: 0, Stock: 0, Bond: 0, Crypto: 0 };
+  const byType = { Stock: 0, Bond: 0, Crypto: 0 };
   for (const holding of state.holdings) {
     const value = holding.quantity * holding.currentPrice;
-    if (holding.assetType === "Cash") {
-      byType.Cash += value;
-    } else if (holding.assetType === "Stock" || holding.assetType === "ETF" || holding.assetType === "Other") {
-      byType.Stock += value;
-    } else if (holding.assetType === "Bond") {
+    const normalizedType = (holding.assetType || "").toLowerCase();
+
+    if (normalizedType === "bond") {
       byType.Bond += value;
-    } else if (holding.assetType === "Crypto") {
+    } else if (normalizedType === "crypto") {
       byType.Crypto += value;
+    } else {
+      byType.Stock += value;
     }
   }
 
@@ -463,17 +616,17 @@ function renderTable() {
   for (const holding of visibleHoldings) {
     const clone = ui.rowTemplate.content.cloneNode(true);
     const row = clone.querySelector("tr");
-    row.dataset.id = holding.id;
+    row.dataset.id = String(holding.id);
 
     const marketValue = holding.quantity * holding.currentPrice;
     const pnl = marketValue - holding.quantity * holding.avgPrice;
 
     setCell(clone, "ticker", holding.ticker);
     setCell(clone, "companyName", holding.companyName);
-    setCell(clone, "quantity", formatNumber(holding.quantity, 4));
+    setCell(clone, "quantity", formatNumber(holding.quantity, 0));
     setCell(clone, "avgPrice", formatCurrency(holding.avgPrice));
     setCell(clone, "currentPrice", formatCurrency(holding.currentPrice));
-    setCell(clone, "purchaseDate", holding.purchaseDate ? formatDate(holding.purchaseDate) : "—");
+    setCell(clone, "purchaseDate", holding.purchaseDate ? formatDate(holding.purchaseDate) : "-");
 
     const pnlCell = setCell(clone, "pnl", formatCurrency(pnl));
     pnlCell.classList.add(pnl >= 0 ? "positive" : "negative");
@@ -631,11 +784,7 @@ function drawNoData(ctx, width, height) {
 
 function snapshotHistory() {
   const totalValue = state.holdings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0);
-
-  const label = new Date().toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric"
-  });
+  const label = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
   const existing = state.history[state.history.length - 1];
   if (existing && existing.label === label) {
@@ -646,35 +795,6 @@ function snapshotHistory() {
       state.history = state.history.slice(-30);
     }
   }
-
-  localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(state.history));
-}
-
-async function fetchSamplePrice(ticker) {
-  try {
-    const response = await fetch(
-      `https://c4rm9elh30.execute-api.us-east-1.amazonaws.com/default/cachedPriceData?ticker=${encodeURIComponent(ticker)}`
-    );
-
-    if (!response.ok) {
-      return 0;
-    }
-
-    const data = await response.json();
-
-    const candidates = [
-      data.price,
-      data.close,
-      data.currentPrice,
-      data.regularMarketPrice,
-      data?.quote?.regularMarketPrice
-    ];
-
-    const value = candidates.find((x) => typeof x === "number" && x > 0);
-    return value || 0;
-  } catch {
-    return 0;
-  }
 }
 
 function normalizeHolding(raw) {
@@ -682,46 +802,38 @@ function normalizeHolding(raw) {
     return null;
   }
 
-  const normalized = {
-    id: String(raw.id || crypto.randomUUID()),
-    ticker: String(raw.ticker || raw.stockTicker || "").toUpperCase(),
-    companyName: String(raw.companyName || raw.name || "").trim(),
-    assetType: String(raw.assetType || raw.type || "Other"),
-    quantity: Number(raw.quantity ?? raw.volume ?? 0),
-    avgPrice: Number(raw.avgPrice ?? raw.averagePrice ?? 0),
-    currentPrice: Number(raw.currentPrice ?? raw.price ?? raw.avgPrice ?? 0)
-  };
+  const id = Number(raw.id);
+  const ticker = String(raw.symbol || raw.ticker || "").trim().toUpperCase();
+  const quantity = Number(raw.quantity);
+  const avgPrice = Number(raw.buyPrice ?? raw.avgPrice ?? 0);
+  const currentPrice = Number(raw.currentPrice ?? avgPrice);
 
-  if (!normalized.companyName) {
-    normalized.companyName = inferCompanyName(normalized.ticker);
-  }
-
-  if (!normalized.ticker || normalized.quantity < 0 || normalized.avgPrice < 0 || normalized.currentPrice < 0) {
+  if (!Number.isInteger(id) || id <= 0 || !ticker || !Number.isInteger(quantity) || quantity <= 0) {
     return null;
   }
 
-  return normalized;
+  return {
+    id,
+    ticker,
+    companyName: String(raw.companyName || inferCompanyName(ticker)).trim(),
+    assetType: normalizeAssetType(String(raw.assetType || "Other")),
+    quantity,
+    avgPrice,
+    currentPrice,
+    purchaseDate: String(raw.purchaseDate || "")
+  };
 }
 
-function seedDemoData() {
-  state.balance = 15000;
-  state.holdings = [
-    { id: crypto.randomUUID(), ticker: "AAPL", companyName: "Apple Inc.", assetType: "Stock", quantity: 35, avgPrice: 120, currentPrice: 145.32, purchaseDate: "2023-03-15" },
-    { id: crypto.randomUUID(), ticker: "TSLA", companyName: "Tesla Inc.", assetType: "Stock", quantity: 20, avgPrice: 650, currentPrice: 720.15, purchaseDate: "2022-11-20" },
-    { id: crypto.randomUUID(), ticker: "AMZN", companyName: "Amazon.com Inc.", assetType: "Stock", quantity: 10, avgPrice: 3100, currentPrice: 3340.5, purchaseDate: "2021-06-10" },
-    { id: crypto.randomUUID(), ticker: "GOOGL", companyName: "Alphabet Inc.", assetType: "Stock", quantity: 8, avgPrice: 2500, currentPrice: 2750.75, purchaseDate: "2022-01-05" },
-    { id: crypto.randomUUID(), ticker: "BND", companyName: "Vanguard Total Bond", assetType: "Bond", quantity: 25, avgPrice: 68.4, currentPrice: 71.1, purchaseDate: "2023-07-22" },
-    { id: crypto.randomUUID(), ticker: "BTC", companyName: "Bitcoin", assetType: "Crypto", quantity: 0.18, avgPrice: 52000, currentPrice: 61000, purchaseDate: "2024-01-30" },
-    { id: crypto.randomUUID(), ticker: "CASH", companyName: "Cash Reserve", assetType: "Cash", quantity: 1, avgPrice: 5200, currentPrice: 5200, purchaseDate: "2023-01-01" }
-  ];
+function normalizeAssetType(assetType) {
+  const normalized = String(assetType || "").trim().toLowerCase();
 
-  persistLocalPortfolio();
-  snapshotHistory();
-}
-
-function persistLocalPortfolio() {
-  localStorage.setItem(STORAGE_KEYS.holdings, JSON.stringify(state.holdings));
-  localStorage.setItem(STORAGE_KEYS.balance, String(state.balance));
+  if (normalized === "stock") return "Stock";
+  if (normalized === "bond") return "Bond";
+  if (normalized === "crypto") return "Crypto";
+  if (normalized === "mutual fund") return "Mutual Fund";
+  if (normalized === "cash") return "Cash";
+  if (normalized === "etf") return "ETF";
+  return "Other";
 }
 
 function setHoldingFormError(message) {
@@ -746,6 +858,15 @@ function setCell(root, key, text) {
   return node;
 }
 
+async function readApiError(response) {
+  try {
+    const payload = await response.json();
+    return payload.message || payload.error || `Request failed with status ${response.status}`;
+  } catch {
+    return `Request failed with status ${response.status}`;
+  }
+}
+
 function inferCompanyName(ticker) {
   const names = {
     AAPL: "Apple Inc.",
@@ -762,14 +883,6 @@ function inferCompanyName(ticker) {
   };
 
   return names[ticker] || `${ticker} Holdings`;
-}
-
-function parseJson(value, fallback) {
-  try {
-    return value ? JSON.parse(value) : fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 function formatCurrency(value) {
@@ -792,8 +905,8 @@ function formatSignedPercent(value) {
 }
 
 function formatDate(dateStr) {
-  if (!dateStr) return "\u2014";
+  if (!dateStr) return "-";
   const date = new Date(dateStr + "T00:00:00");
-  if (isNaN(date.getTime())) return dateStr;
+  if (Number.isNaN(date.getTime())) return dateStr;
   return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(date);
 }

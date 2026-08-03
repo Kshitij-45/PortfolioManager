@@ -13,14 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Set;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional
 public class PortfolioService {
 
-    private static final Set<String> SUPPORTED_ASSET_TYPES = Set.of("stock", "bond", "crypto", "mutual fund");
+    private static final Set<String> SUPPORTED_ASSET_TYPES = Set.of(
+            "stock", "bond", "crypto", "mutual fund", "cash", "etf", "other");
 
     private final PortfolioRepository portfolioRepository;
     private final BalanceService balanceService;
@@ -139,7 +140,11 @@ public class PortfolioService {
     }
 
     private boolean isStockAsset(String assetType) {
-        return assetType != null && assetType.equalsIgnoreCase("Stock");
+        if (assetType == null) {
+            return false;
+        }
+        String normalized = assetType.trim().toLowerCase();
+        return normalized.equals("stock") || normalized.equals("etf");
     }
 
     private void adjustBalanceForRequiredAmount(BigDecimal requiredAmount) {
@@ -152,7 +157,7 @@ public class PortfolioService {
             throw new InsufficientBalanceException(available.doubleValue(), requiredAmount.doubleValue());
         }
 
-        balanceService.addBalance(available.subtract(requiredAmount).subtract(available));
+        balanceService.deductBalance(requiredAmount);
     }
 
     private void creditBalance(BigDecimal amount) {

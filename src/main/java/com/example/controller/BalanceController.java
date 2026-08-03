@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/balance")
+@CrossOrigin(origins = "*")
 public class BalanceController {
 
     private final BalanceService balanceService;
