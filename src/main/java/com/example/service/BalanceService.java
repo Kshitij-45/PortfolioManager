@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.entity.Balance;
+import com.example.exception.InvalidBalanceAmountException;
 import com.example.exception.InsufficientBalanceException;
 import com.example.repository.BalanceRepository;
 
@@ -25,7 +26,11 @@ public class BalanceService {
     }
 
     // Add Money
-    public void addBalance(BigDecimal amount) {
+    public Balance addBalance(BigDecimal amount) {
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidBalanceAmountException("Amount must be greater than 0");
+        }
 
         Balance balance = balanceRepository.getBalance();
 
@@ -35,6 +40,8 @@ public class BalanceService {
         balance.setAvailableBalance(updatedBalance);
 
         balanceRepository.updateBalance(balance);
+
+        return balance;
     }
 
     // Deduct Money

@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.dto.BalanceDTO;
+import com.example.dto.BalanceUpdateResponseDTO;
 import com.example.entity.Balance;
 import com.example.service.BalanceService;
 
@@ -27,10 +28,14 @@ public class BalanceController {
 
     // Add Money
     @PostMapping("/add")
-    public ResponseEntity<String> addBalance(@Valid @RequestBody BalanceDTO balanceDTO) {
+    public ResponseEntity<BalanceUpdateResponseDTO> addBalance(@Valid @RequestBody BalanceDTO balanceDTO) {
 
-        balanceService.addBalance(balanceDTO.getAmount());
+        Balance updatedBalance = balanceService.addBalance(balanceDTO.getAmount());
+        BalanceUpdateResponseDTO response = new BalanceUpdateResponseDTO(
+                "Balance added successfully.",
+                balanceDTO.getAmount(),
+                updatedBalance.getAvailableBalance());
 
-        return ResponseEntity.ok("Balance added successfully.");
+        return ResponseEntity.ok(response);
     }
 }

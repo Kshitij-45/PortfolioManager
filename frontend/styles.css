@@ -438,6 +438,10 @@ canvas {
   margin: -0.15rem 0 0.1rem;
 }
 
+.form-hint {
+  margin-top: -0.2rem;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;

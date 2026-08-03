@@ -27,12 +27,19 @@ const state = {
 const ui = {
   navLinks: Array.from(document.querySelectorAll(".nav-link")),
   holdingForm: document.getElementById("holdingForm"),
+  openAddMoneyModalBtn: document.getElementById("openAddMoneyModalBtn"),
   openAddPanelBtn: document.getElementById("openAddPanelBtn"),
   openAddFromHoldingsBtn: document.getElementById("openAddFromHoldingsBtn"),
   addAssetModal: document.getElementById("addAssetModal"),
   closeAddAssetModalBtn: document.getElementById("closeAddAssetModalBtn"),
   removeAssetModal: document.getElementById("removeAssetModal"),
   closeRemoveAssetModalBtn: document.getElementById("closeRemoveAssetModalBtn"),
+  addMoneyModal: document.getElementById("addMoneyModal"),
+  closeAddMoneyModalBtn: document.getElementById("closeAddMoneyModalBtn"),
+  addMoneyForm: document.getElementById("addMoneyForm"),
+  addMoneyAmountInput: document.getElementById("addMoneyAmountInput"),
+  addMoneyFormError: document.getElementById("addMoneyFormError"),
+  addMoneySubmit: document.getElementById("addMoneySubmit"),
   removeHoldingForm: document.getElementById("removeHoldingForm"),
   removeHoldingSelect: document.getElementById("removeHoldingSelect"),
   removeHoldingAvailable: document.getElementById("removeHoldingAvailable"),
@@ -86,6 +93,10 @@ function attachEvents() {
     link.addEventListener("click", onSidebarNavClick);
   }
 
+  ui.openAddMoneyModalBtn.addEventListener("click", openAddMoneyModal);
+  ui.addMoneyForm.addEventListener("submit", onAddMoneySubmit);
+  ui.closeAddMoneyModalBtn.addEventListener("click", closeAddMoneyModal);
+  ui.addMoneyModal.addEventListener("click", onModalClick);
   ui.holdingForm.addEventListener("submit", onHoldingAdd);
   ui.removeHoldingForm.addEventListener("submit", onHoldingRemove);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
@@ -130,6 +141,7 @@ function setActiveNav(hash) {
 }
 
 function openAddAssetModal() {
+  closeAddMoneyModal();
   closeRemoveAssetModal();
   ui.addAssetModal.classList.remove("hidden");
   ui.addAssetModal.setAttribute("aria-hidden", "false");
@@ -148,6 +160,7 @@ function closeAddAssetModal() {
 }
 
 function openRemoveAssetModal() {
+  closeAddMoneyModal();
   closeAddAssetModal();
   syncRemoveHoldingOptions();
   ui.removeAssetModal.classList.remove("hidden");
@@ -166,10 +179,30 @@ function closeRemoveAssetModal() {
   updateModalBodyState();
 }
 
+function openAddMoneyModal() {
+  closeAddAssetModal();
+  closeRemoveAssetModal();
+  clearAddMoneyFormError();
+  ui.addMoneyModal.classList.remove("hidden");
+  ui.addMoneyModal.setAttribute("aria-hidden", "false");
+  updateModalBodyState();
+
+  ui.addMoneyAmountInput.focus();
+}
+
+function closeAddMoneyModal() {
+  ui.addMoneyModal.classList.add("hidden");
+  ui.addMoneyModal.setAttribute("aria-hidden", "true");
+  ui.addMoneyForm.reset();
+  clearAddMoneyFormError();
+  updateModalBodyState();
+}
+
 function updateModalBodyState() {
   const addOpen = !ui.addAssetModal.classList.contains("hidden");
   const removeOpen = !ui.removeAssetModal.classList.contains("hidden");
-  document.body.classList.toggle("modal-open", addOpen || removeOpen);
+  const moneyOpen = !ui.addMoneyModal.classList.contains("hidden");
+  document.body.classList.toggle("modal-open", addOpen || removeOpen || moneyOpen);
 }
 
 function onModalClick(event) {
@@ -179,7 +212,14 @@ function onModalClick(event) {
   }
 
   if (target.dataset.closeModal === "true") {
-    closeAddAssetModal();
+    const modal = event.currentTarget;
+    if (modal === ui.addAssetModal) {
+      closeAddAssetModal();
+    } else if (modal === ui.removeAssetModal) {
+      closeRemoveAssetModal();
+    } else if (modal === ui.addMoneyModal) {
+      closeAddMoneyModal();
+    }
   }
 }
 
@@ -191,6 +231,26 @@ function onGlobalKeyDown(event) {
   if (event.key === "Escape" && !ui.removeAssetModal.classList.contains("hidden")) {
     closeRemoveAssetModal();
   }
+
+  if (event.key === "Escape" && !ui.addMoneyModal.classList.contains("hidden")) {
+    closeAddMoneyModal();
+  }
+}
+
+function onAddMoneySubmit(event) {
+  event.preventDefault();
+  clearAddMoneyFormError();
+
+  const amount = Number(ui.addMoneyAmountInput.value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    setAddMoneyFormError("Enter a valid amount greater than 0.");
+    return;
+  }
+
+  state.balance = Number((state.balance + amount).toFixed(2));
+  persistLocalPortfolio();
+  renderSummary();
+  closeAddMoneyModal();
 }
 
 function onViewControlChange() {
@@ -668,6 +728,14 @@ function setHoldingFormError(message) {
 
 function clearHoldingFormError() {
   ui.holdingFormError.textContent = "";
+}
+
+function setAddMoneyFormError(message) {
+  ui.addMoneyFormError.textContent = message;
+}
+
+function clearAddMoneyFormError() {
+  ui.addMoneyFormError.textContent = "";
 }
 
 function setCell(root, key, text) {
