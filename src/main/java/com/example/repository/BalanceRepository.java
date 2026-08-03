@@ -1,9 +1,13 @@
 package com.example.repository;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+
+import com.example.entity.Balance;
+import com.example.mapper.BalanceRowMapper;
 
 @Repository
 public class BalanceRepository {
@@ -12,24 +16,51 @@ public class BalanceRepository {
     private static final BigDecimal DEFAULT_BALANCE = new BigDecimal("10000.00");
 
     private final JdbcTemplate jdbcTemplate;
+    private final BalanceRowMapper balanceRowMapper;
 
-    public BalanceRepository(JdbcTemplate jdbcTemplate) {
+    public BalanceRepository(JdbcTemplate jdbcTemplate,
+                             BalanceRowMapper balanceRowMapper) {
         this.jdbcTemplate = jdbcTemplate;
+        this.balanceRowMapper = balanceRowMapper;
         ensureTableAndSeed();
     }
 
-    public BigDecimal getAvailableBalance() {
-        String sql = "SELECT available_balance FROM account_balance WHERE id = ?";
-        BigDecimal balance = jdbcTemplate.queryForObject(sql, BigDecimal.class, ACCOUNT_ID);
-        return balance == null ? BigDecimal.ZERO : balance;
+    // Get Balance
+    public Balance getBalance() {
+
+        String sql = """
+                SELECT id,
+                       available_balance
+                FROM account_balance
+                WHERE id = ?
+                """;
+
+        List<Balance> balances = jdbcTemplate.query(
+                sql,
+                balanceRowMapper,
+                ACCOUNT_ID);
+
+        return balances.get(0);
     }
 
-    public void setAvailableBalance(BigDecimal balance) {
-        String sql = "UPDATE account_balance SET available_balance = ? WHERE id = ?";
-        jdbcTemplate.update(sql, balance, ACCOUNT_ID);
+    // Update Balance
+    public void updateBalance(Balance balance) {
+
+        String sql = """
+                UPDATE account_balance
+                SET available_balance = ?
+                WHERE id = ?
+                """;
+
+        jdbcTemplate.update(
+                sql,
+                balance.getAvailableBalance(),
+                balance.getId());
     }
 
+    // Create table and insert initial balance
     private void ensureTableAndSeed() {
+
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS account_balance (
                     id INT PRIMARY KEY,
@@ -43,10 +74,13 @@ public class BalanceRepository {
                 ACCOUNT_ID);
 
         if (count == null || count == 0) {
+
             jdbcTemplate.update(
-                    "INSERT INTO account_balance (id, available_balance) VALUES (?, ?)",
+                    "INSERT INTO account_balance(id, available_balance) VALUES(?, ?)",
                     ACCOUNT_ID,
                     DEFAULT_BALANCE);
         }
     }
+
+    
 }

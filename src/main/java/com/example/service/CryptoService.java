@@ -1,6 +1,7 @@
 package com.example.service;
 
-import com.example.Exception.AssetNotFoundException;
+import com.example.exception.AssetNotFoundException;
+import com.example.exception.InvalidSymbolException;
 import com.example.dto.CryptoQuoteDTO;
 import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,7 @@ public class CryptoService extends BaseMarketDataService {
      * Use Yahoo Finance format: BTC-USD, ETH-USD, SOL-USD, BNB-USD, etc.
      */
     public CryptoQuoteDTO getQuote(String symbol) {
-        String upperSymbol = symbol.trim().toUpperCase();
+        String upperSymbol = normalizeSymbol(symbol, "crypto");
         JsonNode meta = fetchChartMeta(upperSymbol);
         if (meta == null || meta.isMissingNode()) {
             throw new AssetNotFoundException("Crypto", upperSymbol);
@@ -41,11 +42,12 @@ public class CryptoService extends BaseMarketDataService {
      * Get quotes for multiple crypto symbols.
      */
     public List<CryptoQuoteDTO> getQuotes(List<String> symbols) {
+        validateBatchSymbols(symbols, "crypto");
         List<CryptoQuoteDTO> results = new ArrayList<>();
         for (String symbol : symbols) {
             try {
                 results.add(getQuote(symbol));
-            } catch (AssetNotFoundException ignored) {
+            } catch (AssetNotFoundException | InvalidSymbolException ignored) {
                 // skip invalid symbols in batch
             }
         }

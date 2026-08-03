@@ -1,4 +1,4 @@
-package com.example.Exception;
+package com.example.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +34,16 @@ public class GlobalException {
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
+    @ExceptionHandler(MarketDataUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleMarketDataUnavailableException(MarketDataUnavailableException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
+    @ExceptionHandler(MarketDataParsingException.class)
+    public ResponseEntity<Map<String, Object>> handleMarketDataParsingException(MarketDataParsingException ex) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
     @ExceptionHandler(InvalidPortfolioException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidPortfolioException(InvalidPortfolioException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
@@ -46,6 +56,21 @@ public class GlobalException {
 
     @ExceptionHandler(InsufficientBalanceException.class)
     public ResponseEntity<Map<String, Object>> handleInsufficientBalanceException(InsufficientBalanceException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidSymbolException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidSymbolException(InvalidSymbolException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(EmptyBatchRequestException.class)
+    public ResponseEntity<Map<String, Object>> handleEmptyBatchRequestException(EmptyBatchRequestException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(UnsupportedAssetTypeException.class)
+    public ResponseEntity<Map<String, Object>> handleUnsupportedAssetTypeException(UnsupportedAssetTypeException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 

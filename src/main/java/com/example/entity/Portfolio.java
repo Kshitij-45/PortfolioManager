@@ -1,5 +1,5 @@
 package com.example.entity;
-
+import java.math.BigDecimal;
 public class Portfolio {
 
     private Integer id;
@@ -16,7 +16,7 @@ public class Portfolio {
 
     private Double currentPrice;
 
-    private Double availableBalance;
+    private BigDecimal availableBalance;
 
     public Integer getId() {
         return id;
@@ -74,11 +74,11 @@ public class Portfolio {
         this.currentPrice = currentPrice;
     }
 
-    public Double getAvailableBalance() {
+    public BigDecimal getAvailableBalance() {
         return availableBalance;
     }
 
-    public void setAvailableBalance(Double availableBalance) {
+    public void setAvailableBalance(BigDecimal availableBalance) {
         this.availableBalance = availableBalance;
     }
 

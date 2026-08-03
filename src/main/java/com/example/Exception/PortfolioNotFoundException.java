@@ -1,4 +1,4 @@
-package com.example.Exception;
+package com.example.exception;
 
 public class PortfolioNotFoundException extends RuntimeException {
 

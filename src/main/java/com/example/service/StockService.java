@@ -1,7 +1,7 @@
 package com.example.service;
 
-import com.example.Exception.StockNotFoundException;
-import com.example.Exception.StockServiceException;
+import com.example.exception.InvalidSymbolException;
+import com.example.exception.StockNotFoundException;
 import com.example.dto.StockQuoteDTO;
 import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ public class StockService extends BaseMarketDataService {
      * Get a full quote for a single stock symbol (e.g. "AAPL", "TSLA").
      */
     public StockQuoteDTO getQuote(String symbol) {
-        String upperSymbol = symbol.trim().toUpperCase();
+        String upperSymbol = normalizeSymbol(symbol, "stock");
         JsonNode meta = fetchChartMeta(upperSymbol);
         if (meta == null || meta.isMissingNode()) {
             throw new StockNotFoundException(upperSymbol);
@@ -41,11 +41,12 @@ public class StockService extends BaseMarketDataService {
      * Get quotes for multiple symbols at once.
      */
     public List<StockQuoteDTO> getQuotes(List<String> symbols) {
+        validateBatchSymbols(symbols, "stock");
         List<StockQuoteDTO> results = new ArrayList<>();
         for (String symbol : symbols) {
             try {
                 results.add(getQuote(symbol));
-            } catch (StockNotFoundException ignored) {
+            } catch (StockNotFoundException | InvalidSymbolException ignored) {
                 // skip invalid symbols in batch
             }
         }

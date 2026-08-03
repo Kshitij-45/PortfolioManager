@@ -1,6 +1,7 @@
 package com.example.service;
 
-import com.example.Exception.AssetNotFoundException;
+import com.example.exception.AssetNotFoundException;
+import com.example.exception.InvalidSymbolException;
 import com.example.dto.MutualFundQuoteDTO;
 import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,7 @@ public class MutualFundService extends BaseMarketDataService {
      * Examples: VFINX (Vanguard 500), FXAIX (Fidelity 500), VTSAX, FSKAX
      */
     public MutualFundQuoteDTO getQuote(String symbol) {
-        String upperSymbol = symbol.trim().toUpperCase();
+        String upperSymbol = normalizeSymbol(symbol, "mutual fund");
         JsonNode meta = fetchChartMeta(upperSymbol);
         if (meta == null || meta.isMissingNode()) {
             throw new AssetNotFoundException("Mutual Fund", upperSymbol);
@@ -41,11 +42,12 @@ public class MutualFundService extends BaseMarketDataService {
      * Get quotes for multiple mutual fund symbols.
      */
     public List<MutualFundQuoteDTO> getQuotes(List<String> symbols) {
+        validateBatchSymbols(symbols, "mutual fund");
         List<MutualFundQuoteDTO> results = new ArrayList<>();
         for (String symbol : symbols) {
             try {
                 results.add(getQuote(symbol));
-            } catch (AssetNotFoundException ignored) {
+            } catch (AssetNotFoundException | InvalidSymbolException ignored) {
                 // skip invalid symbols in batch
             }
         }

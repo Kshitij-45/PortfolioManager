@@ -1,6 +1,7 @@
 package com.example.service;
 
-import com.example.Exception.AssetNotFoundException;
+import com.example.exception.AssetNotFoundException;
+import com.example.exception.InvalidSymbolException;
 import com.example.dto.BondQuoteDTO;
 import tools.jackson.databind.JsonNode;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,7 @@ public class BondService extends BaseMarketDataService {
      *           ^TNX (10-yr yield), ^TYX (30-yr yield), BND, IEF
      */
     public BondQuoteDTO getQuote(String symbol) {
-        String upperSymbol = symbol.trim().toUpperCase();
+        String upperSymbol = normalizeSymbol(symbol, "bond");
         JsonNode meta = fetchChartMeta(upperSymbol);
         if (meta == null || meta.isMissingNode()) {
             throw new AssetNotFoundException("Bond", upperSymbol);
@@ -42,11 +43,12 @@ public class BondService extends BaseMarketDataService {
      * Get quotes for multiple bond symbols.
      */
     public List<BondQuoteDTO> getQuotes(List<String> symbols) {
+        validateBatchSymbols(symbols, "bond");
         List<BondQuoteDTO> results = new ArrayList<>();
         for (String symbol : symbols) {
             try {
                 results.add(getQuote(symbol));
-            } catch (AssetNotFoundException ignored) {
+            } catch (AssetNotFoundException | InvalidSymbolException ignored) {
                 // skip invalid symbols in batch
             }
         }

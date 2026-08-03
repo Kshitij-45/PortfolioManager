@@ -1,4 +1,4 @@
-package com.example.Exception;
+package com.example.exception;
 
 public class InsufficientBalanceException extends RuntimeException {
 
@@ -7,5 +7,10 @@ public class InsufficientBalanceException extends RuntimeException {
                 + String.format("%.2f", availableBalance)
                 + ", Required: "
                 + String.format("%.2f", requiredAmount));
+    }
+
+    public InsufficientBalanceException(String string) {
+        
+        super(string);
     }
 }

@@ -1,36 +1,40 @@
 package com.example.service;
 
-import com.example.Exception.InvalidIdException;
-import com.example.Exception.InvalidPortfolioException;
-import com.example.Exception.InsufficientBalanceException;
-import com.example.Exception.PortfolioNotFoundException;
+import com.example.exception.InvalidIdException;
+import com.example.exception.InvalidPortfolioException;
+import com.example.exception.InsufficientBalanceException;
+import com.example.exception.PortfolioNotFoundException;
+import com.example.exception.UnsupportedAssetTypeException;
 import com.example.dto.PortfolioDTO;
 import com.example.entity.Portfolio;
-import com.example.repository.BalanceRepository;
 import com.example.repository.PortfolioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Set;
 import java.util.List;
 
 @Service
 @Transactional
 public class PortfolioService {
 
-    private final PortfolioRepository portfolioRepository;
-    private final BalanceRepository balanceRepository;
+    private static final Set<String> SUPPORTED_ASSET_TYPES = Set.of("stock", "bond", "crypto", "mutual fund");
 
-    public PortfolioService(PortfolioRepository portfolioRepository, BalanceRepository balanceRepository) {
+    private final PortfolioRepository portfolioRepository;
+    private final BalanceService balanceService;
+
+    public PortfolioService(PortfolioRepository portfolioRepository, BalanceService balanceService) {
         this.portfolioRepository = portfolioRepository;
-        this.balanceRepository = balanceRepository;
+        this.balanceService = balanceService;
     }
 
     public Portfolio createPortfolio(PortfolioDTO portfolioDTO) {
         if (portfolioDTO == null) {
             throw new InvalidPortfolioException("Portfolio data cannot be null");
         }
+        validateAssetType(portfolioDTO.getAssetType());
 
         BigDecimal requiredAmount = purchaseAmount(portfolioDTO.getAssetType(), portfolioDTO.getQuantity(), portfolioDTO.getBuyPrice());
         adjustBalanceForRequiredAmount(requiredAmount);
@@ -43,14 +47,14 @@ public class PortfolioService {
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
         Portfolio saved = portfolioRepository.save(portfolio);
-        saved.setAvailableBalance(getAvailableBalance());
+        saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return saved;
     }
 
     @Transactional(readOnly = true)
     public List<Portfolio> getAllPortfolios() {
         List<Portfolio> portfolios = portfolioRepository.findAll();
-        double balance = getAvailableBalance();
+        BigDecimal balance = balanceService.getBalance().getAvailableBalance();
         portfolios.forEach(p -> p.setAvailableBalance(balance));
         return portfolios;
     }
@@ -60,7 +64,7 @@ public class PortfolioService {
         validateId(id);
         Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new PortfolioNotFoundException(id));
-        portfolio.setAvailableBalance(getAvailableBalance());
+        portfolio.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return portfolio;
     }
 
@@ -69,6 +73,7 @@ public class PortfolioService {
         if (portfolioDTO == null) {
             throw new InvalidPortfolioException("Portfolio data cannot be null");
         }
+        validateAssetType(portfolioDTO.getAssetType());
 
         Portfolio existing = portfolioRepository.findById(id)
                 .orElseThrow(() -> new PortfolioNotFoundException(id));
@@ -92,7 +97,7 @@ public class PortfolioService {
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
         Portfolio saved = portfolioRepository.save(portfolio);
-        saved.setAvailableBalance(getAvailableBalance());
+        saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return saved;
     }
 
@@ -118,7 +123,7 @@ public class PortfolioService {
 
     @Transactional(readOnly = true)
     public double getAvailableBalance() {
-        return balanceRepository.getAvailableBalance().doubleValue();
+        return balanceService.getBalance().getAvailableBalance().doubleValue();
     }
 
     private BigDecimal purchaseAmount(String assetType, Integer quantity, Double buyPrice) {
@@ -140,12 +145,12 @@ public class PortfolioService {
             return;
         }
 
-        BigDecimal available = balanceRepository.getAvailableBalance();
+        BigDecimal available = balanceService.getBalance().getAvailableBalance();
         if (available.compareTo(requiredAmount) < 0) {
             throw new InsufficientBalanceException(available.doubleValue(), requiredAmount.doubleValue());
         }
 
-        balanceRepository.setAvailableBalance(available.subtract(requiredAmount));
+        balanceService.addBalance(available.subtract(requiredAmount).subtract(available));
     }
 
     private void creditBalance(BigDecimal amount) {
@@ -153,13 +158,21 @@ public class PortfolioService {
             return;
         }
 
-        BigDecimal available = balanceRepository.getAvailableBalance();
-        balanceRepository.setAvailableBalance(available.add(amount));
+        balanceService.addBalance(amount);
     }
 
     private void validateId(Integer id) {
         if (id == null || id <= 0) {
             throw new InvalidIdException(id);
+        }
+    }
+
+    private void validateAssetType(String assetType) {
+        if (assetType == null || assetType.isBlank()) {
+            throw new UnsupportedAssetTypeException(String.valueOf(assetType));
+        }
+        if (!SUPPORTED_ASSET_TYPES.contains(assetType.trim().toLowerCase())) {
+            throw new UnsupportedAssetTypeException(assetType);
         }
     }
 }

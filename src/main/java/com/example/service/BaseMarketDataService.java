@@ -1,12 +1,19 @@
 package com.example.service;
 
-import com.example.Exception.StockServiceException;
+import com.example.exception.EmptyBatchRequestException;
+import com.example.exception.InvalidSymbolException;
+import com.example.exception.MarketDataParsingException;
+import com.example.exception.MarketDataUnavailableException;
+import com.example.exception.StockServiceException;
 import tools.jackson.databind.JsonNode;
 import org.springframework.http.*;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 
 /**
  * Shared base for all Yahoo Finance v8 chart-based market data services.
@@ -34,13 +41,31 @@ public abstract class BaseMarketDataService {
                     YAHOO_CHART_URL, HttpMethod.GET, entity, JsonNode.class, symbol);
 
             JsonNode root = response.getBody();
-            if (root == null) return null;
+            if (root == null) {
+                throw new MarketDataUnavailableException(symbol, "Empty response from market data provider");
+            }
 
-            JsonNode results = root.path("chart").path("result");
+            JsonNode chart = root.path("chart");
+            if (chart == null || chart.isMissingNode() || chart.isNull()) {
+                throw new MarketDataParsingException(symbol, "Missing chart node in provider response");
+            }
+
+            JsonNode error = chart.path("error");
+            if (error != null && !error.isMissingNode() && !error.isNull()) {
+                throw new MarketDataUnavailableException(symbol, String.valueOf(error));
+            }
+
+            JsonNode results = chart.path("result");
             if (results.isArray() && !results.isEmpty()) {
                 return results.get(0).path("meta");
             }
             return null;
+        } catch (ResourceAccessException e) {
+            throw new MarketDataUnavailableException(symbol, e.getMessage());
+        } catch (RestClientResponseException e) {
+            throw new MarketDataUnavailableException(symbol, "HTTP " + e.getStatusCode().value() + " from provider");
+        } catch (MarketDataUnavailableException | MarketDataParsingException e) {
+            throw e;
         } catch (Exception e) {
             throw new StockServiceException(symbol, e.getMessage());
         }
@@ -58,7 +83,28 @@ public abstract class BaseMarketDataService {
 
     protected String textOrNull(JsonNode node, String field) {
         JsonNode n = node.get(field);
-        return (n != null && !n.isNull()) ? n.asText() : null;
+        return (n != null && !n.isNull()) ? jsonNodeToString(n) : null;
+    }
+
+    protected String normalizeSymbol(String symbol, String assetType) {
+        if (symbol == null || symbol.isBlank()) {
+            throw new InvalidSymbolException(assetType);
+        }
+        return symbol.trim().toUpperCase();
+    }
+
+    protected void validateBatchSymbols(List<String> symbols, String assetType) {
+        if (symbols == null || symbols.isEmpty()) {
+            throw new EmptyBatchRequestException(assetType);
+        }
+    }
+
+    private String jsonNodeToString(JsonNode node) {
+        String raw = String.valueOf(node);
+        if (raw.length() >= 2 && raw.charAt(0) == '"' && raw.charAt(raw.length() - 1) == '"') {
+            return raw.substring(1, raw.length() - 1);
+        }
+        return raw;
     }
 
     protected BigDecimal decimalOrNull(JsonNode node, String field) {
