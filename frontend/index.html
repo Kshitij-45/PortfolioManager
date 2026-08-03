@@ -164,11 +164,12 @@
         </label>
         <label>
           Current Price
-          <input name="currentPrice" type="number" min="0" step="0.01" placeholder="155" />
+          <input name="currentPrice" type="number" min="0" step="0.01" placeholder="Fetched from market" readonly />
         </label>
+        <p id="holdingPriceStatus" class="muted form-note"></p>
         <label>
           Purchase Date
-          <input name="purchaseDate" type="date" required />
+          <input name="purchaseDate" type="date" required readonly />
         </label>
         <p id="holdingFormError" class="form-error" aria-live="polite"></p>
         <button class="btn modal-submit" type="submit">Add Holding</button>
@@ -229,6 +230,6 @@
     </tr>
   </template>
 
-  <script src="app.js" defer></script>
+  <script src="app.js?v=20260803b" defer></script>
 </body>
 </html>
