@@ -74,4 +74,10 @@ public class PortfolioController {
         boolean exists = portfolioService.existsById(id);
         return ResponseEntity.ok(exists);
     }
+
+    // GET available balance
+    @GetMapping("/balance")
+    public ResponseEntity<Double> getAvailableBalance() {
+        return ResponseEntity.ok(portfolioService.getAvailableBalance());
+    }
 }

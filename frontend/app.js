@@ -1,6 +1,7 @@
 const STORAGE_KEYS = {
   holdings: "pm_holdings",
-  history: "pm_history"
+  history: "pm_history",
+  balance: "pm_balance"
 };
 
 const COLORS = [
@@ -15,6 +16,7 @@ const COLORS = [
 const state = {
   holdings: [],
   history: [],
+  balance: 10000,
   view: {
     search: "",
     type: "All",
@@ -43,6 +45,7 @@ const ui = {
   refreshPricesBtn: document.getElementById("refreshPricesBtn"),
   headerTotalValue: document.getElementById("headerTotalValue"),
   headerReturn: document.getElementById("headerReturn"),
+  headerAvailableBalance: document.getElementById("headerAvailableBalance"),
   cashValue: document.getElementById("cashValue"),
   stocksValue: document.getElementById("stocksValue"),
   bondsValue: document.getElementById("bondsValue"),
@@ -50,6 +53,7 @@ const ui = {
   holdingsSearch: document.getElementById("holdingsSearch"),
   holdingsTypeFilter: document.getElementById("holdingsTypeFilter"),
   holdingsSort: document.getElementById("holdingsSort"),
+  holdingFormError: document.getElementById("holdingFormError"),
   allocationChart: document.getElementById("allocationChart"),
   allocationLegend: document.getElementById("allocationLegend"),
   historyChart: document.getElementById("historyChart")
@@ -71,6 +75,10 @@ async function init() {
 function hydrateFromStorage() {
   state.holdings = parseJson(localStorage.getItem(STORAGE_KEYS.holdings), []);
   state.history = parseJson(localStorage.getItem(STORAGE_KEYS.history), []);
+  state.balance = Number(localStorage.getItem(STORAGE_KEYS.balance));
+  if (!Number.isFinite(state.balance) || state.balance < 0) {
+    state.balance = 10000;
+  }
 }
 
 function attachEvents() {
@@ -194,6 +202,8 @@ function onViewControlChange() {
 
 async function onHoldingAdd(event) {
   event.preventDefault();
+  clearHoldingFormError();
+
   const formData = new FormData(ui.holdingForm);
 
   const holding = {
@@ -211,7 +221,20 @@ async function onHoldingAdd(event) {
   }
 
   if (!holding.ticker || holding.quantity <= 0 || holding.avgPrice < 0 || holding.currentPrice < 0) {
+    setHoldingFormError("Enter valid symbol, quantity, and prices.");
     return;
+  }
+
+  const buyCost = holding.quantity * holding.avgPrice;
+  if (holding.assetType === "Stock" && buyCost > state.balance) {
+    setHoldingFormError(
+      `Insufficient balance. Available ${formatCurrency(state.balance)}, required ${formatCurrency(buyCost)}.`
+    );
+    return;
+  }
+
+  if (holding.assetType === "Stock") {
+    state.balance = Number((state.balance - buyCost).toFixed(2));
   }
 
   state.holdings.push(holding);
@@ -291,6 +314,11 @@ async function onHoldingRemove(event) {
     holding.quantity = Number(remainingShares.toFixed(8));
   }
 
+  if (holding.assetType === "Stock") {
+    const creditedAmount = quantityToRemove * holding.avgPrice;
+    state.balance = Number((state.balance + creditedAmount).toFixed(2));
+  }
+
   persistLocalPortfolio();
 
   closeRemoveAssetModal();
@@ -347,8 +375,9 @@ function renderSummary() {
   ui.headerTotalValue.textContent = formatCurrency(totalValue);
   ui.headerReturn.textContent = formatSignedPercent(returnPct);
   ui.headerReturn.style.color = returnPct >= 0 ? "var(--good)" : "var(--bad)";
+  ui.headerAvailableBalance.textContent = formatCurrency(state.balance);
 
-  ui.cashValue.textContent = formatCurrency(byType.Cash);
+  ui.cashValue.textContent = formatCurrency(state.balance);
   ui.stocksValue.textContent = formatCurrency(byType.Stock);
   ui.bondsValue.textContent = formatCurrency(byType.Bond);
   ui.cryptoValue.textContent = formatCurrency(byType.Crypto);
@@ -613,6 +642,7 @@ function normalizeHolding(raw) {
 }
 
 function seedDemoData() {
+  state.balance = 15000;
   state.holdings = [
     { id: crypto.randomUUID(), ticker: "AAPL", companyName: "Apple Inc.", assetType: "Stock", quantity: 35, avgPrice: 120, currentPrice: 145.32 },
     { id: crypto.randomUUID(), ticker: "TSLA", companyName: "Tesla Inc.", assetType: "Stock", quantity: 20, avgPrice: 650, currentPrice: 720.15 },
@@ -629,6 +659,15 @@ function seedDemoData() {
 
 function persistLocalPortfolio() {
   localStorage.setItem(STORAGE_KEYS.holdings, JSON.stringify(state.holdings));
+  localStorage.setItem(STORAGE_KEYS.balance, String(state.balance));
+}
+
+function setHoldingFormError(message) {
+  ui.holdingFormError.textContent = message;
+}
+
+function clearHoldingFormError() {
+  ui.holdingFormError.textContent = "";
 }
 
 function setCell(root, key, text) {

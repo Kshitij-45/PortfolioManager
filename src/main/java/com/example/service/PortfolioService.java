@@ -2,13 +2,17 @@ package com.example.service;
 
 import com.example.Exception.InvalidIdException;
 import com.example.Exception.InvalidPortfolioException;
+import com.example.Exception.InsufficientBalanceException;
 import com.example.Exception.PortfolioNotFoundException;
 import com.example.dto.PortfolioDTO;
 import com.example.entity.Portfolio;
+import com.example.repository.BalanceRepository;
 import com.example.repository.PortfolioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -16,15 +20,21 @@ import java.util.List;
 public class PortfolioService {
 
     private final PortfolioRepository portfolioRepository;
+    private final BalanceRepository balanceRepository;
 
-    public PortfolioService(PortfolioRepository portfolioRepository) {
+    public PortfolioService(PortfolioRepository portfolioRepository, BalanceRepository balanceRepository) {
         this.portfolioRepository = portfolioRepository;
+        this.balanceRepository = balanceRepository;
     }
 
     public Portfolio createPortfolio(PortfolioDTO portfolioDTO) {
         if (portfolioDTO == null) {
             throw new InvalidPortfolioException("Portfolio data cannot be null");
         }
+
+        BigDecimal requiredAmount = purchaseAmount(portfolioDTO.getAssetType(), portfolioDTO.getQuantity(), portfolioDTO.getBuyPrice());
+        adjustBalanceForRequiredAmount(requiredAmount);
+
         Portfolio portfolio = new Portfolio();
         portfolio.setSymbol(portfolioDTO.getSymbol());
         portfolio.setCompanyName(portfolioDTO.getCompanyName());
@@ -32,19 +42,26 @@ public class PortfolioService {
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
-        return portfolioRepository.save(portfolio);
+        Portfolio saved = portfolioRepository.save(portfolio);
+        saved.setAvailableBalance(getAvailableBalance());
+        return saved;
     }
 
     @Transactional(readOnly = true)
     public List<Portfolio> getAllPortfolios() {
-        return portfolioRepository.findAll();
+        List<Portfolio> portfolios = portfolioRepository.findAll();
+        double balance = getAvailableBalance();
+        portfolios.forEach(p -> p.setAvailableBalance(balance));
+        return portfolios;
     }
 
     @Transactional(readOnly = true)
     public Portfolio getPortfolioById(Integer id) {
         validateId(id);
-        return portfolioRepository.findById(id)
+        Portfolio portfolio = portfolioRepository.findById(id)
                 .orElseThrow(() -> new PortfolioNotFoundException(id));
+        portfolio.setAvailableBalance(getAvailableBalance());
+        return portfolio;
     }
 
     public Portfolio updatePortfolio(Integer id, PortfolioDTO portfolioDTO) {
@@ -53,8 +70,17 @@ public class PortfolioService {
             throw new InvalidPortfolioException("Portfolio data cannot be null");
         }
 
-        if (!portfolioRepository.existsById(id)) {
-            throw new PortfolioNotFoundException(id);
+        Portfolio existing = portfolioRepository.findById(id)
+                .orElseThrow(() -> new PortfolioNotFoundException(id));
+
+        BigDecimal existingAmount = purchaseAmount(existing.getAssetType(), existing.getQuantity(), existing.getBuyPrice());
+        BigDecimal newAmount = purchaseAmount(portfolioDTO.getAssetType(), portfolioDTO.getQuantity(), portfolioDTO.getBuyPrice());
+        BigDecimal delta = newAmount.subtract(existingAmount);
+
+        if (delta.compareTo(BigDecimal.ZERO) > 0) {
+            adjustBalanceForRequiredAmount(delta);
+        } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
+            creditBalance(delta.abs());
         }
 
         Portfolio portfolio = new Portfolio();
@@ -65,14 +91,22 @@ public class PortfolioService {
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
-        return portfolioRepository.save(portfolio);
+        Portfolio saved = portfolioRepository.save(portfolio);
+        saved.setAvailableBalance(getAvailableBalance());
+        return saved;
     }
 
     public void deletePortfolio(Integer id) {
         validateId(id);
-        if (!portfolioRepository.existsById(id)) {
-            throw new PortfolioNotFoundException(id);
+
+        Portfolio existing = portfolioRepository.findById(id)
+                .orElseThrow(() -> new PortfolioNotFoundException(id));
+
+        BigDecimal amountToRefund = purchaseAmount(existing.getAssetType(), existing.getQuantity(), existing.getBuyPrice());
+        if (amountToRefund.compareTo(BigDecimal.ZERO) > 0) {
+            creditBalance(amountToRefund);
         }
+
         portfolioRepository.deleteById(id);
     }
 
@@ -80,6 +114,47 @@ public class PortfolioService {
     public boolean existsById(Integer id) {
         validateId(id);
         return portfolioRepository.existsById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public double getAvailableBalance() {
+        return balanceRepository.getAvailableBalance().doubleValue();
+    }
+
+    private BigDecimal purchaseAmount(String assetType, Integer quantity, Double buyPrice) {
+        if (!isStockAsset(assetType)) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal qty = BigDecimal.valueOf(quantity == null ? 0 : quantity);
+        BigDecimal price = BigDecimal.valueOf(buyPrice == null ? 0.0 : buyPrice);
+        return qty.multiply(price).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private boolean isStockAsset(String assetType) {
+        return assetType != null && assetType.equalsIgnoreCase("Stock");
+    }
+
+    private void adjustBalanceForRequiredAmount(BigDecimal requiredAmount) {
+        if (requiredAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        BigDecimal available = balanceRepository.getAvailableBalance();
+        if (available.compareTo(requiredAmount) < 0) {
+            throw new InsufficientBalanceException(available.doubleValue(), requiredAmount.doubleValue());
+        }
+
+        balanceRepository.setAvailableBalance(available.subtract(requiredAmount));
+    }
+
+    private void creditBalance(BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        BigDecimal available = balanceRepository.getAvailableBalance();
+        balanceRepository.setAvailableBalance(available.add(amount));
     }
 
     private void validateId(Integer id) {

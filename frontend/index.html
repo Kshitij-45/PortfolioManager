@@ -22,6 +22,10 @@
           <span>Total Return:</span>
           <strong id="headerReturn">+0.0%</strong>
         </div>
+        <div class="metric-pill">
+          <span>Available Balance:</span>
+          <strong id="headerAvailableBalance">$0.00</strong>
+        </div>
       </div>
       <div class="top-actions">
         <button id="openAddPanelBtn" class="btn" type="button">+ Add Asset</button>
@@ -160,6 +164,7 @@
           Current Price
           <input name="currentPrice" type="number" min="0" step="0.01" placeholder="155" />
         </label>
+        <p id="holdingFormError" class="form-error" aria-live="polite"></p>
         <button class="btn modal-submit" type="submit">Add Holding</button>
       </form>
     </div>

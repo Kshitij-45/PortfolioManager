@@ -16,6 +16,8 @@ public class Portfolio {
 
     private Double currentPrice;
 
+    private Double availableBalance;
+
     public Integer getId() {
         return id;
     }
@@ -70,6 +72,14 @@ public class Portfolio {
 
     public void setCurrentPrice(Double currentPrice) {
         this.currentPrice = currentPrice;
+    }
+
+    public Double getAvailableBalance() {
+        return availableBalance;
+    }
+
+    public void setAvailableBalance(Double availableBalance) {
+        this.availableBalance = availableBalance;
     }
 
     
