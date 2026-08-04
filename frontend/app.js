@@ -18,7 +18,7 @@ let API_BASE = resolveApiBase();
 const API_BASE_CANDIDATES = buildApiBaseCandidates();
 const PRICE_LOOKUP_DEBOUNCE_MS = 350;
 
-const COLORS = ["#7a5b36", "#a67c52", "#c79d6d", "#5f6f52", "#8c5a44", "#bba07a"];
+const COLORS = ["#b7a3e6", "#9f90cc", "#cec2e9", "#a5aad7", "#c8b3df", "#aea1d4"];
 
 const state = {
   holdings: [],
@@ -1421,7 +1421,7 @@ function renderSymbolPerformanceChart() {
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  ctx.strokeStyle = "#d8cab6";
+  ctx.strokeStyle = "#3a3e52";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i += 1) {
     const y = padding.top + (i / 4) * chartHeight;
@@ -1431,7 +1431,7 @@ function renderSymbolPerformanceChart() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#7a5b36";
+  ctx.strokeStyle = "#b7a3e6";
   ctx.lineWidth = 3;
   ctx.beginPath();
 
@@ -1452,7 +1452,7 @@ function renderSymbolPerformanceChart() {
 
   const firstPoint = state.symbolPerformance.points[0];
   const lastPoint = state.symbolPerformance.points[pointCount - 1];
-  ctx.fillStyle = "#6e5d48";
+  ctx.fillStyle = "#b4bdd6";
   ctx.font = "12px IBM Plex Mono";
   ctx.fillText(formatCurrency(max), 6, padding.top + 4);
   ctx.fillText(formatCurrency(min), 6, height - padding.bottom);
@@ -1461,7 +1461,7 @@ function renderSymbolPerformanceChart() {
 }
 
 function drawSymbolNoData(ctx, width, height) {
-  ctx.fillStyle = "#6e5d48";
+  ctx.fillStyle = "#b4bdd6";
   ctx.font = "15px Space Grotesk";
   ctx.fillText("Click a range to load historical price data.", 20, height / 2);
 }
@@ -1571,7 +1571,7 @@ function renderHistoryChart() {
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  ctx.strokeStyle = "#d8cab6";
+  ctx.strokeStyle = "#3a3e52";
   ctx.lineWidth = 1;
 
   for (let i = 0; i <= 4; i += 1) {
@@ -1582,7 +1582,7 @@ function renderHistoryChart() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#7a5b36";
+  ctx.strokeStyle = "#b7a3e6";
   ctx.lineWidth = 3;
   ctx.beginPath();
 
@@ -1608,13 +1608,13 @@ function renderHistoryChart() {
     const x = padding.left + chartWidth / 2;
     const y = padding.top + ((max - point.value) / range) * chartHeight;
 
-    ctx.fillStyle = "#7a5b36";
+    ctx.fillStyle = "#b7a3e6";
     ctx.beginPath();
     ctx.arc(x, y, 5, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  ctx.fillStyle = "#6e5d48";
+  ctx.fillStyle = "#b4bdd6";
   ctx.font = "12px IBM Plex Mono";
   ctx.fillText(formatCurrency(max), 6, padding.top + 4);
   ctx.fillText(formatCurrency(min), 6, height - padding.bottom);
@@ -1623,7 +1623,7 @@ function renderHistoryChart() {
 }
 
 function drawNoData(ctx, width, height) {
-  ctx.fillStyle = "#6e5d48";
+  ctx.fillStyle = "#b4bdd6";
   ctx.font = "15px Space Grotesk";
   ctx.fillText("Add holdings with purchase dates to plot profit/loss.", 20, height / 2);
 }
