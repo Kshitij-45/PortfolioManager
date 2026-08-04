@@ -4,9 +4,6 @@ import com.example.entity.PortfolioHistory;
 import com.example.mapper.PortfolioHistoryRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 @Repository

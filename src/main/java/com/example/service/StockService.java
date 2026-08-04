@@ -4,6 +4,7 @@ import com.example.exception.InvalidSymbolException;
 import com.example.exception.StockNotFoundException;
 import com.example.exception.MarketDataParsingException;
 import com.example.exception.MarketDataUnavailableException;
+import com.example.dto.MarketCandleDTO;
 import com.example.dto.StockHistoryPointDTO;
 import com.example.dto.StockQuoteDTO;
 import tools.jackson.databind.JsonNode;
@@ -62,6 +63,14 @@ public class StockService extends BaseMarketDataService {
             }
         }
         return results;
+    }
+
+    /**
+     * Returns OHLCV data used by the recommendation engine.
+     */
+    public List<MarketCandleDTO> getDailyHistory(String symbol, String range) {
+        String upperSymbol = normalizeSymbol(symbol, "stock");
+        return fetchDailyHistory(upperSymbol, range);
     }
 
     /**

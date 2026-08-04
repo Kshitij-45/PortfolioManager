@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "yahoo.api.connect-timeout-ms",
+      "type": "java.lang.Integer",
+      "defaultValue": 2500,
+      "description": "Connect timeout for Yahoo Finance API calls in milliseconds."
+    },
+    {
+      "name": "yahoo.api.read-timeout-ms",
+      "type": "java.lang.Integer",
+      "defaultValue": 5000,
+      "description": "Read timeout for Yahoo Finance API calls in milliseconds."
+    }
+  ]
+}

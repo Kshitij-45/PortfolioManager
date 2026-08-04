@@ -1,5 +1,6 @@
 package com.example.service;
 
+import com.example.dto.MarketCandleDTO;
 import com.example.exception.AssetNotFoundException;
 import com.example.exception.InvalidSymbolException;
 import com.example.dto.CryptoQuoteDTO;
@@ -52,6 +53,14 @@ public class CryptoService extends BaseMarketDataService {
             }
         }
         return results;
+    }
+
+    /**
+     * Returns OHLCV data used by the recommendation engine.
+     */
+    public List<MarketCandleDTO> getDailyHistory(String symbol, String range) {
+        String upperSymbol = normalizeCryptoSymbol(symbol);
+        return fetchDailyHistory(upperSymbol, range);
     }
 
     private String normalizeCryptoSymbol(String symbol) {

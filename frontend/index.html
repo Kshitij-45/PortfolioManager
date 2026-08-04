@@ -41,6 +41,7 @@
           <a href="#dashboardSection" class="nav-link active">Dashboard</a>
           <a href="#holdingsSection" class="nav-link">Holdings</a>
           <a href="#performanceSection" class="nav-link">Performance</a>
+          <a href="#aiSuggestionsSection" class="nav-link">AI Suggestions</a>
         </nav>
       </aside>
 
@@ -119,6 +120,56 @@
             <p>Crypto Value</p>
             <h3 id="cryptoValue">$0.00</h3>
           </article>
+        </section>
+
+        <section id="aiSuggestionsSection" class="panel ai-section">
+          <div class="panel-header ai-header">
+            <div>
+              <h2>AI Investment Suggestions</h2>
+              <p class="muted">Ranked using 6-month Yahoo market data and technical indicators.</p>
+            </div>
+            <button id="refreshRecommendationsBtn" class="btn ghost" type="button">Refresh Suggestions</button>
+          </div>
+
+          <div class="ai-filters">
+            <input id="recSearch" type="search" placeholder="Search ticker or name" />
+            <select id="recAssetTypeFilter" aria-label="Filter by asset type">
+              <option value="All">Asset: All</option>
+              <option value="Stock">Stock</option>
+              <option value="Crypto">Crypto</option>
+              <option value="ETF/Fund">ETF/Fund</option>
+              <option value="Bond ETF">Bond ETF</option>
+            </select>
+            <select id="recRiskFilter" aria-label="Filter by risk level">
+              <option value="All">Risk: All</option>
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+            <select id="recRecommendationFilter" aria-label="Filter by recommendation">
+              <option value="All">Recommendation: All</option>
+              <option value="STRONG_BUY">Strong Buy</option>
+              <option value="BUY">Buy</option>
+              <option value="HOLD">Hold</option>
+              <option value="AVOID">Avoid</option>
+            </select>
+            <select id="recSort" aria-label="Sort recommendations">
+              <option value="scoreDesc">Sort: Score high to low</option>
+              <option value="confidenceDesc">Sort: Confidence high to low</option>
+              <option value="priceDesc">Sort: Price high to low</option>
+              <option value="priceAsc">Sort: Price low to high</option>
+            </select>
+          </div>
+
+          <div class="ai-tabs" role="tablist" aria-label="Recommendation categories">
+            <button type="button" class="ai-tab active" data-tab="stocks">Stocks</button>
+            <button type="button" class="ai-tab" data-tab="crypto">Crypto</button>
+            <button type="button" class="ai-tab" data-tab="funds">ETFs</button>
+            <button type="button" class="ai-tab" data-tab="bonds">Bond ETFs</button>
+          </div>
+
+          <div id="recommendationCards" class="recommendation-grid"></div>
+          <p id="recommendationEmptyState" class="muted empty" hidden>No recommendations available.</p>
         </section>
 
         <section id="assetEditor" class="editor-section" aria-hidden="true"></section>

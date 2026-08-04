@@ -1,5 +1,6 @@
 package com.example.service;
 
+import com.example.dto.MarketCandleDTO;
 import com.example.exception.AssetNotFoundException;
 import com.example.exception.InvalidSymbolException;
 import com.example.dto.BondQuoteDTO;
@@ -53,6 +54,14 @@ public class BondService extends BaseMarketDataService {
             }
         }
         return results;
+    }
+
+    /**
+     * Returns OHLCV data used by the recommendation engine.
+     */
+    public List<MarketCandleDTO> getDailyHistory(String symbol, String range) {
+        String upperSymbol = normalizeSymbol(symbol, "bond");
+        return fetchDailyHistory(upperSymbol, range);
     }
 
     private BondQuoteDTO mapToDTO(JsonNode meta) {

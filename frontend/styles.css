@@ -495,6 +495,129 @@ body.modal-open {
   overflow: hidden;
 }
 
+.ai-section {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.ai-header {
+  align-items: flex-start;
+}
+
+.ai-filters {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.ai-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ai-tab {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: #6e5d48;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.4rem 0.95rem;
+  cursor: pointer;
+}
+
+.ai-tab.active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.8rem;
+}
+
+.rec-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.rec-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.rec-title {
+  font-size: 1.02rem;
+  color: #453523;
+}
+
+.rec-ticker {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+  color: #6f604d;
+}
+
+.rec-badge {
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.22rem 0.58rem;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.rec-badge.strong-buy {
+  background: #0b4b2a;
+}
+
+.rec-badge.buy {
+  background: #2f8c41;
+}
+
+.rec-badge.hold {
+  background: #b58a17;
+}
+
+.rec-badge.avoid {
+  background: #b9382a;
+}
+
+.rec-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  font-size: 0.86rem;
+}
+
+.rec-reasons {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.18rem;
+  color: #5f4a31;
+  font-size: 0.82rem;
+}
+
+.rec-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn.view-details-btn {
+  padding: 0.38rem 0.72rem;
+  font-size: 0.8rem;
+}
+
 @media (max-width: 1180px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -518,6 +641,10 @@ body.modal-open {
   }
 
   .holding-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-filters {
     grid-template-columns: 1fr;
   }
 }

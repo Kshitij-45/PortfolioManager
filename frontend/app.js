@@ -24,6 +24,12 @@ const state = {
   holdings: [],
   history: [],
   balance: 0,
+  recommendations: {
+    stocks: [],
+    crypto: [],
+    funds: [],
+    bonds: []
+  },
   priceLookupToken: 0,
   priceLookupTimer: null,
   symbolPerformance: {
@@ -35,6 +41,14 @@ const state = {
     search: "",
     type: "All",
     sort: "valueDesc"
+  },
+  recView: {
+    search: "",
+    assetType: "All",
+    risk: "All",
+    recommendation: "All",
+    sort: "scoreDesc",
+    tab: "stocks"
   }
 };
 
@@ -84,7 +98,16 @@ const ui = {
   holdingPriceStatus: document.getElementById("holdingPriceStatus"),
   allocationChart: document.getElementById("allocationChart"),
   allocationLegend: document.getElementById("allocationLegend"),
-  historyChart: document.getElementById("historyChart")
+  historyChart: document.getElementById("historyChart"),
+  refreshRecommendationsBtn: document.getElementById("refreshRecommendationsBtn"),
+  recSearch: document.getElementById("recSearch"),
+  recAssetTypeFilter: document.getElementById("recAssetTypeFilter"),
+  recRiskFilter: document.getElementById("recRiskFilter"),
+  recRecommendationFilter: document.getElementById("recRecommendationFilter"),
+  recSort: document.getElementById("recSort"),
+  aiTabButtons: Array.from(document.querySelectorAll(".ai-tab")),
+  recommendationCards: document.getElementById("recommendationCards"),
+  recommendationEmptyState: document.getElementById("recommendationEmptyState")
 };
 
 init();
@@ -93,7 +116,7 @@ async function init() {
   attachEvents();
   ui.removeQuantityInput.step = "1";
   ui.removeQuantityInput.min = "1";
-  await refreshPortfolioState();
+  await Promise.all([refreshPortfolioState(), refreshRecommendations()]);
 }
 
 function buildApiBaseCandidates() {
@@ -189,6 +212,38 @@ function attachEvents() {
   ui.holdingsSearch.addEventListener("input", onViewControlChange);
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
+
+  if (ui.refreshRecommendationsBtn) {
+    ui.refreshRecommendationsBtn.addEventListener("click", () => {
+      void refreshRecommendations();
+    });
+  }
+
+  if (ui.recSearch) {
+    ui.recSearch.addEventListener("input", onRecommendationViewChange);
+  }
+
+  if (ui.recRiskFilter) {
+    ui.recRiskFilter.addEventListener("change", onRecommendationViewChange);
+  }
+
+  if (ui.recAssetTypeFilter) {
+    ui.recAssetTypeFilter.addEventListener("change", onRecommendationViewChange);
+  }
+
+  if (ui.recRecommendationFilter) {
+    ui.recRecommendationFilter.addEventListener("change", onRecommendationViewChange);
+  }
+
+  if (ui.recSort) {
+    ui.recSort.addEventListener("change", onRecommendationViewChange);
+  }
+
+  if (ui.aiTabButtons.length > 0) {
+    ui.aiTabButtons.forEach((button) => {
+      button.addEventListener("click", onRecommendationTabClick);
+    });
+  }
 
   document.addEventListener("keydown", onGlobalKeyDown);
   window.addEventListener("hashchange", syncActiveNavFromHash);
@@ -577,6 +632,232 @@ function onViewControlChange() {
   state.view.type = ui.holdingsTypeFilter.value;
   state.view.sort = ui.holdingsSort.value;
   renderTable();
+}
+
+function onRecommendationViewChange() {
+  state.recView.search = String(ui.recSearch?.value || "").trim().toUpperCase();
+  state.recView.assetType = String(ui.recAssetTypeFilter?.value || "All");
+  state.recView.risk = String(ui.recRiskFilter?.value || "All");
+  state.recView.recommendation = String(ui.recRecommendationFilter?.value || "All");
+  state.recView.sort = String(ui.recSort?.value || "scoreDesc");
+  renderRecommendations();
+}
+
+function onRecommendationTabClick(event) {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const nextTab = String(target.dataset.tab || "stocks");
+  state.recView.tab = nextTab;
+  ui.aiTabButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === nextTab);
+  });
+
+  renderRecommendations();
+}
+
+async function refreshRecommendations() {
+  if (!ui.refreshRecommendationsBtn) {
+    return;
+  }
+
+  ui.refreshRecommendationsBtn.disabled = true;
+  ui.refreshRecommendationsBtn.textContent = "Refreshing...";
+
+  try {
+    const response = await apiFetch("/api/recommendations");
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+
+    const payload = await response.json();
+    state.recommendations = {
+      stocks: Array.isArray(payload?.stocks) ? payload.stocks : [],
+      crypto: Array.isArray(payload?.crypto) ? payload.crypto : [],
+      funds: Array.isArray(payload?.funds) ? payload.funds : [],
+      bonds: Array.isArray(payload?.bonds) ? payload.bonds : []
+    };
+
+    renderRecommendations();
+  } catch (error) {
+    state.recommendations = { stocks: [], crypto: [], funds: [], bonds: [] };
+    renderRecommendations(`Unable to load recommendations: ${error.message}`);
+  } finally {
+    ui.refreshRecommendationsBtn.disabled = false;
+    ui.refreshRecommendationsBtn.textContent = "Refresh Suggestions";
+  }
+}
+
+function renderRecommendations(errorMessage = "") {
+  if (!ui.recommendationCards || !ui.recommendationEmptyState) {
+    return;
+  }
+
+  const tab = state.recView.tab || "stocks";
+  const source = Array.isArray(state.recommendations[tab]) ? state.recommendations[tab] : [];
+  const filtered = filterRecommendations(source);
+  const sorted = sortRecommendations(filtered);
+
+  ui.recommendationCards.innerHTML = "";
+
+  if (errorMessage) {
+    ui.recommendationEmptyState.hidden = false;
+    ui.recommendationEmptyState.textContent = errorMessage;
+    return;
+  }
+
+  if (sorted.length === 0) {
+    ui.recommendationEmptyState.hidden = false;
+    ui.recommendationEmptyState.textContent = source.length === 0
+      ? "No recommendations available right now."
+      : "No recommendations match the current filters.";
+    return;
+  }
+
+  ui.recommendationEmptyState.hidden = true;
+  for (const item of sorted) {
+    ui.recommendationCards.append(buildRecommendationCard(item));
+  }
+}
+
+function filterRecommendations(items) {
+  const search = state.recView.search;
+  const assetType = state.recView.assetType;
+  const risk = state.recView.risk;
+  const recommendation = state.recView.recommendation;
+
+  return items.filter((item) => {
+    const ticker = String(item.ticker || "").toUpperCase();
+    const companyName = String(item.companyName || "").toUpperCase();
+    const itemAssetType = String(item.assetType || "");
+    const itemRisk = String(item.riskLevel || "");
+    const itemRecommendation = String(item.recommendation || "");
+
+    const matchesSearch = !search || ticker.includes(search) || companyName.includes(search);
+    const matchesAssetType = assetType === "All" || itemAssetType === assetType;
+    const matchesRisk = risk === "All" || itemRisk === risk;
+    const matchesRecommendation = recommendation === "All" || itemRecommendation === recommendation;
+
+    return matchesSearch && matchesAssetType && matchesRisk && matchesRecommendation;
+  });
+}
+
+function sortRecommendations(items) {
+  const mode = state.recView.sort;
+  const sorted = [...items];
+
+  sorted.sort((a, b) => {
+    const scoreA = Number(a.score || 0);
+    const scoreB = Number(b.score || 0);
+    const confidenceA = Number(a.confidence || 0);
+    const confidenceB = Number(b.confidence || 0);
+    const priceA = Number(a.currentPrice || 0);
+    const priceB = Number(b.currentPrice || 0);
+
+    if (mode === "confidenceDesc") {
+      return confidenceB - confidenceA;
+    }
+
+    if (mode === "priceDesc") {
+      return priceB - priceA;
+    }
+
+    if (mode === "priceAsc") {
+      return priceA - priceB;
+    }
+
+    return scoreB - scoreA;
+  });
+
+  return sorted;
+}
+
+function buildRecommendationCard(item) {
+  const card = document.createElement("article");
+  card.className = "rec-card";
+
+  const recommendationLabel = humanizeRecommendation(item.recommendation);
+  const badgeClass = recommendationBadgeClass(item.recommendation);
+  const reasons = Array.isArray(item.reasons) ? item.reasons.slice(0, 4) : [];
+
+  card.innerHTML = `
+    <div class="rec-top">
+      <div>
+        <h3 class="rec-title">${escapeHtml(item.companyName || item.ticker || "Unknown")}</h3>
+        <p class="rec-ticker">${escapeHtml(item.ticker || "-")} - ${escapeHtml(item.assetType || "-")}</p>
+      </div>
+      <span class="rec-badge ${badgeClass}">${recommendationLabel}</span>
+    </div>
+    <div class="rec-metrics">
+      <div><strong>Price:</strong> ${formatCurrency(Number(item.currentPrice || 0))}</div>
+      <div><strong>AI Score:</strong> ${Number(item.score || 0)}</div>
+      <div><strong>Confidence:</strong> ${Number(item.confidence || 0)}%</div>
+      <div><strong>Risk:</strong> ${escapeHtml(item.riskLevel || "-")}</div>
+    </div>
+  `;
+
+  const reasonList = document.createElement("ul");
+  reasonList.className = "rec-reasons";
+  for (const reason of reasons) {
+    const li = document.createElement("li");
+    li.textContent = String(reason || "");
+    reasonList.append(li);
+  }
+
+  if (reasons.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "No strong technical signal currently.";
+    reasonList.append(li);
+  }
+
+  card.append(reasonList);
+
+  const actions = document.createElement("div");
+  actions.className = "rec-actions";
+
+  const detailsBtn = document.createElement("button");
+  detailsBtn.type = "button";
+  detailsBtn.className = "btn ghost view-details-btn";
+  detailsBtn.textContent = "View Details";
+  detailsBtn.addEventListener("click", () => {
+    const ticker = encodeURIComponent(String(item.ticker || "").trim());
+    if (!ticker) {
+      return;
+    }
+    window.open(`https://finance.yahoo.com/quote/${ticker}`, "_blank", "noopener");
+  });
+
+  actions.append(detailsBtn);
+  card.append(actions);
+
+  return card;
+}
+
+function humanizeRecommendation(value) {
+  const normalized = String(value || "").toUpperCase();
+  if (normalized === "STRONG_BUY") return "Strong Buy";
+  if (normalized === "BUY") return "Buy";
+  if (normalized === "HOLD") return "Hold";
+  return "Avoid";
+}
+
+function recommendationBadgeClass(value) {
+  const normalized = String(value || "").toUpperCase();
+  if (normalized === "STRONG_BUY") return "strong-buy";
+  if (normalized === "BUY") return "buy";
+  if (normalized === "HOLD") return "hold";
+  return "avoid";
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 async function onHoldingAdd(event) {
@@ -1039,6 +1320,7 @@ function renderAll() {
   renderTable();
   renderAllocation();
   renderHistoryChart();
+  renderRecommendations();
   syncRemoveHoldingOptions();
 }
 

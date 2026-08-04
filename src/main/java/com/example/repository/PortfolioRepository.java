@@ -59,16 +59,14 @@ public class PortfolioRepository {
                 """
                 SELECT COUNT(*)
                 FROM information_schema.columns
-                WHERE table_schema = DATABASE()
-                  AND table_name = 'portfolio'
-                  AND column_name = 'purchase_date'
+                                WHERE LOWER(table_name) = 'portfolio'
+                                    AND LOWER(column_name) = 'purchase_date'
                 """,
                 Integer.class);
 
         if (count == null || count == 0) {
-            jdbcTemplate.execute("ALTER TABLE portfolio ADD COLUMN purchase_date DATE NULL");
-            jdbcTemplate.execute("UPDATE portfolio SET purchase_date = CURDATE() WHERE purchase_date IS NULL");
-            jdbcTemplate.execute("ALTER TABLE portfolio MODIFY COLUMN purchase_date DATE NOT NULL");
+                        jdbcTemplate.execute("ALTER TABLE portfolio ADD COLUMN purchase_date DATE");
+                        jdbcTemplate.execute("UPDATE portfolio SET purchase_date = CURRENT_DATE WHERE purchase_date IS NULL");
         }
     }
 
