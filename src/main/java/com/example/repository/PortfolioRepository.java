@@ -1,6 +1,8 @@
 package com.example.repository;
 
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +31,7 @@ public class PortfolioRepository {
         this.jdbcTemplate = jdbcTemplate;
         this.portfolioRowMapper = portfolioRowMapper;
         ensureTableExists();
+        ensurePurchaseDateColumn();
     }
 
     private void ensureTableExists() {
@@ -44,6 +47,24 @@ public class PortfolioRepository {
                     purchase_date DATE NOT NULL
                 )
                 """);
+    }
+
+    private void ensurePurchaseDateColumn() {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'portfolio'
+                  AND column_name = 'purchase_date'
+                """,
+                Integer.class);
+
+        if (count == null || count == 0) {
+            jdbcTemplate.execute("ALTER TABLE portfolio ADD COLUMN purchase_date DATE NULL");
+            jdbcTemplate.execute("UPDATE portfolio SET purchase_date = CURDATE() WHERE purchase_date IS NULL");
+            jdbcTemplate.execute("ALTER TABLE portfolio MODIFY COLUMN purchase_date DATE NOT NULL");
+        }
     }
 
     // Get All Assets
@@ -85,8 +106,33 @@ public class PortfolioRepository {
         return portfolios.stream().findFirst();
     }
 
+    public Optional<Portfolio> findBySymbol(String symbol) {
+
+        String sql = """
+                SELECT id,
+                       symbol,
+                       company_name,
+                       asset_type,
+                       quantity,
+                       buy_price,
+                       current_price,
+                       purchase_date
+                FROM portfolio
+                WHERE UPPER(symbol) = UPPER(?)
+                """;
+
+                List<Portfolio> portfolios = jdbcTemplate.query(sql, portfolioRowMapper, symbol);
+
+        return portfolios.stream().findFirst();
+    }
+
     // Save or Update Asset
     public Portfolio save(Portfolio portfolio) {
+
+        if (portfolio.getId() == null && portfolio.getSymbol() != null) {
+            findBySymbol(portfolio.getSymbol())
+                    .ifPresent(existing -> mergeWithExistingPortfolio(portfolio, existing));
+        }
 
         if (portfolio.getId() == null) {
 
@@ -139,6 +185,29 @@ public class PortfolioRepository {
         }
 
         return portfolio;
+    }
+
+    private void mergeWithExistingPortfolio(Portfolio incoming, Portfolio existing) {
+        incoming.setId(existing.getId());
+        incoming.setQuantity(existing.getQuantity() + incoming.getQuantity());
+
+        BigDecimal existingCost = BigDecimal.valueOf(existing.getBuyPrice())
+                .multiply(BigDecimal.valueOf(existing.getQuantity()));
+        BigDecimal incomingCost = BigDecimal.valueOf(incoming.getBuyPrice())
+                .multiply(BigDecimal.valueOf(incoming.getQuantity() - existing.getQuantity()));
+        BigDecimal totalQuantity = BigDecimal.valueOf(incoming.getQuantity());
+
+        incoming.setBuyPrice(existingCost.add(incomingCost)
+                .divide(totalQuantity, 4, RoundingMode.HALF_UP)
+                .doubleValue());
+
+        if (incoming.getCompanyName() == null || incoming.getCompanyName().isBlank()) {
+            incoming.setCompanyName(existing.getCompanyName());
+        }
+
+        if (incoming.getAssetType() == null || incoming.getAssetType().isBlank()) {
+            incoming.setAssetType(existing.getAssetType());
+        }
     }
 
     // Delete Asset
