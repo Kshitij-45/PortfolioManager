@@ -335,7 +335,7 @@ async function onHoldingAdd(event) {
   const quantity = Number.parseInt(String(formData.get("quantity") || "0"), 10);
   const avgPrice = Number(formData.get("avgPrice") || 0);
   const currentPrice = Number(formData.get("currentPrice") || 0);
-  const purchaseDate = getTodayDateValue();
+  const purchaseDate = String(formData.get("purchaseDate") || "").trim() || getTodayDateValue();
 
   if (!ticker || !companyName) {
     setHoldingFormError("Symbol and company name are required.");

@@ -4,6 +4,8 @@ import com.example.dto.ProfitSummaryDTO;
 import com.example.entity.Portfolio;
 import com.example.entity.PortfolioHistory;
 import com.example.repository.PortfolioHistoryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -13,6 +15,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class PortfolioHistoryService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PortfolioHistoryService.class);
 
     private final PortfolioHistoryRepository historyRepository;
 
@@ -25,6 +29,9 @@ public class PortfolioHistoryService {
      * Called on every create or update so profit is tracked over time.
      */
     public void recordSnapshot(Portfolio portfolio) {
+        logger.info("Recording portfolio history snapshot: id={}, symbol={}, qty={}",
+            portfolio.getId(), portfolio.getSymbol(), portfolio.getQuantity());
+
         BigDecimal profit = BigDecimal.valueOf(
                 (portfolio.getCurrentPrice() - portfolio.getBuyPrice()) * portfolio.getQuantity()
         );
@@ -39,6 +46,9 @@ public class PortfolioHistoryService {
         history.setProfit(profit);
 
         historyRepository.save(history);
+
+        logger.info("Portfolio history snapshot saved: portfolioId={}, recordedDate={}",
+            history.getPortfolioId(), history.getRecordedDate());
     }
 
     /**

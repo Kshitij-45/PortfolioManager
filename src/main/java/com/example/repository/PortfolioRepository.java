@@ -3,6 +3,7 @@ package com.example.repository;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,6 +13,7 @@ import com.example.mapper.PortfolioRowMapper;
 import org.springframework.stereotype.Repository;
 
 import com.example.entity.Portfolio;
+import com.example.entity.PortfolioHistory;
 
 
 @Repository
@@ -25,11 +27,14 @@ public class PortfolioRepository {
 
     private final JdbcTemplate jdbcTemplate;
     private final PortfolioRowMapper portfolioRowMapper;
+    private final PortfolioHistoryRepository portfolioHistoryRepository;
 
     public PortfolioRepository(JdbcTemplate jdbcTemplate,
-                           PortfolioRowMapper portfolioRowMapper) {
+                           PortfolioRowMapper portfolioRowMapper,
+                           PortfolioHistoryRepository portfolioHistoryRepository) {
         this.jdbcTemplate = jdbcTemplate;
         this.portfolioRowMapper = portfolioRowMapper;
+        this.portfolioHistoryRepository = portfolioHistoryRepository;
         ensureTableExists();
         ensurePurchaseDateColumn();
     }
@@ -106,7 +111,7 @@ public class PortfolioRepository {
         return portfolios.stream().findFirst();
     }
 
-    public Optional<Portfolio> findBySymbol(String symbol) {
+    public Optional<Portfolio> findBySymbolAndPurchaseDate(String symbol, LocalDate purchaseDate) {
 
         String sql = """
                 SELECT id,
@@ -119,9 +124,10 @@ public class PortfolioRepository {
                        purchase_date
                 FROM portfolio
                 WHERE UPPER(symbol) = UPPER(?)
+                                    AND purchase_date = ?
                 """;
 
-                List<Portfolio> portfolios = jdbcTemplate.query(sql, portfolioRowMapper, symbol);
+                                List<Portfolio> portfolios = jdbcTemplate.query(sql, portfolioRowMapper, symbol, purchaseDate);
 
         return portfolios.stream().findFirst();
     }
@@ -129,8 +135,8 @@ public class PortfolioRepository {
     // Save or Update Asset
     public Portfolio save(Portfolio portfolio) {
 
-        if (portfolio.getId() == null && portfolio.getSymbol() != null) {
-            findBySymbol(portfolio.getSymbol())
+        if (portfolio.getId() == null && portfolio.getSymbol() != null && portfolio.getPurchaseDate() != null) {
+            findBySymbolAndPurchaseDate(portfolio.getSymbol(), portfolio.getPurchaseDate())
                     .ifPresent(existing -> mergeWithExistingPortfolio(portfolio, existing));
         }
 
@@ -184,7 +190,26 @@ public class PortfolioRepository {
                     portfolio.getId());
         }
 
+        saveHistorySnapshot(portfolio);
+
         return portfolio;
+    }
+
+    private void saveHistorySnapshot(Portfolio portfolio) {
+        PortfolioHistory history = new PortfolioHistory();
+        history.setPortfolioId(portfolio.getId());
+        history.setSymbol(portfolio.getSymbol());
+        history.setRecordedDate(LocalDate.now());
+        history.setBuyPrice(portfolio.getBuyPrice());
+        history.setCurrentPrice(portfolio.getCurrentPrice());
+        history.setQuantity(portfolio.getQuantity());
+
+        BigDecimal profit = BigDecimal.valueOf(
+                (portfolio.getCurrentPrice() - portfolio.getBuyPrice()) * portfolio.getQuantity())
+                .setScale(4, RoundingMode.HALF_UP);
+        history.setProfit(profit);
+
+        portfolioHistoryRepository.save(history);
     }
 
     private void mergeWithExistingPortfolio(Portfolio incoming, Portfolio existing) {
