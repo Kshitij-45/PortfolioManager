@@ -124,7 +124,7 @@ function attachEvents() {
   syncActiveNavFromHash();
 }
 
-async function refreshPortfolioState(addSnapshot = true) {
+async function refreshPortfolioState() {
   try {
     const [portfoliosResponse, balanceResponse] = await Promise.all([
       fetch(`${API_BASE}/api/portfolios`),
@@ -150,15 +150,14 @@ async function refreshPortfolioState(addSnapshot = true) {
       state.balance = 0;
     }
 
-    if (addSnapshot) {
-      snapshotHistory();
-    }
+    rebuildPerformanceHistory();
 
     renderAll();
   } catch (error) {
     setHoldingFormError(`Unable to load backend data: ${error.message}`);
     state.holdings = [];
     state.balance = 0;
+    state.history = [];
     renderAll();
   }
 }
@@ -936,7 +935,7 @@ function renderHistoryChart() {
 
   ctx.clearRect(0, 0, width, height);
 
-  if (state.history.length < 2) {
+  if (state.history.length === 0) {
     drawNoData(ctx, width, height);
     return;
   }
@@ -965,8 +964,12 @@ function renderHistoryChart() {
   ctx.lineWidth = 3;
   ctx.beginPath();
 
+  const pointCount = state.history.length;
+
   state.history.forEach((point, index) => {
-    const x = padding.left + (index / (state.history.length - 1)) * chartWidth;
+    const x = pointCount === 1
+      ? padding.left + chartWidth / 2
+      : padding.left + (index / (pointCount - 1)) * chartWidth;
     const y = padding.top + ((max - point.value) / range) * chartHeight;
 
     if (index === 0) {
@@ -977,6 +980,17 @@ function renderHistoryChart() {
   });
 
   ctx.stroke();
+
+  if (pointCount === 1) {
+    const point = state.history[0];
+    const x = padding.left + chartWidth / 2;
+    const y = padding.top + ((max - point.value) / range) * chartHeight;
+
+    ctx.fillStyle = "#7a5b36";
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.fillStyle = "#6e5d48";
   ctx.font = "12px IBM Plex Mono";
@@ -989,22 +1003,38 @@ function renderHistoryChart() {
 function drawNoData(ctx, width, height) {
   ctx.fillStyle = "#6e5d48";
   ctx.font = "15px Space Grotesk";
-  ctx.fillText("Need at least two snapshots to draw a trend.", 20, height / 2);
+  ctx.fillText("Add holdings with purchase dates to plot profit/loss.", 20, height / 2);
 }
 
-function snapshotHistory() {
-  const totalValue = state.holdings.reduce((sum, h) => sum + h.quantity * h.currentPrice, 0);
-  const label = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function rebuildPerformanceHistory() {
+  const datedHoldings = state.holdings
+    .map((holding) => ({
+      holding,
+      timestamp: parseHoldingDateValue(holding.purchaseDate)
+    }))
+    .filter((entry) => Number.isFinite(entry.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp);
 
-  const existing = state.history[state.history.length - 1];
-  if (existing && existing.label === label) {
-    existing.value = totalValue;
-  } else {
-    state.history.push({ label, value: totalValue });
-    if (state.history.length > 30) {
-      state.history = state.history.slice(-30);
-    }
+  if (datedHoldings.length === 0) {
+    state.history = [];
+    return;
   }
+
+  const totalsByDate = new Map();
+  let cumulativePnl = 0;
+
+  for (const entry of datedHoldings) {
+    const pnl = entry.holding.quantity * (entry.holding.currentPrice - entry.holding.avgPrice);
+    cumulativePnl += pnl;
+
+    const dateKey = entry.holding.purchaseDate;
+    totalsByDate.set(dateKey, cumulativePnl);
+  }
+
+  state.history = Array.from(totalsByDate, ([dateKey, value]) => ({
+    label: formatShortDate(dateKey),
+    value
+  }));
 }
 
 function normalizeHolding(raw) {
@@ -1141,4 +1171,20 @@ function formatDate(dateStr) {
   const date = new Date(dateStr + "T00:00:00");
   if (Number.isNaN(date.getTime())) return dateStr;
   return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" }).format(date);
+}
+
+function formatShortDate(dateStr) {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr + "T00:00:00");
+  if (Number.isNaN(date.getTime())) return dateStr;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+}
+
+function parseHoldingDateValue(dateStr) {
+  if (!dateStr) {
+    return Number.NaN;
+  }
+
+  const timestamp = Date.parse(`${dateStr}T00:00:00`);
+  return Number.isFinite(timestamp) ? timestamp : Number.NaN;
 }
