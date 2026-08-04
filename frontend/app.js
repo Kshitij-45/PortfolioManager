@@ -14,7 +14,8 @@ function resolveApiBase() {
   return `http://${host}:8080`;
 }
 
-const API_BASE = resolveApiBase();
+let API_BASE = resolveApiBase();
+const API_BASE_CANDIDATES = buildApiBaseCandidates();
 const PRICE_LOOKUP_DEBOUNCE_MS = 350;
 
 const COLORS = ["#7a5b36", "#a67c52", "#c79d6d", "#5f6f52", "#8c5a44", "#bba07a"];
@@ -81,7 +82,60 @@ async function init() {
   attachEvents();
   ui.removeQuantityInput.step = "1";
   ui.removeQuantityInput.min = "1";
-  await refreshPortfolioState(false);
+  await refreshPortfolioState();
+}
+
+function buildApiBaseCandidates() {
+  const candidates = [];
+  const pushCandidate = (value) => {
+    const candidate = String(value || "").trim().replace(/\/$/, "");
+    if (!candidate || candidates.includes(candidate)) {
+      return;
+    }
+
+    candidates.push(candidate);
+  };
+
+  pushCandidate(window.PORTFOLIO_API_BASE);
+
+  if (window.location.protocol.startsWith("http") && window.location.port === "8080") {
+    pushCandidate(window.location.origin);
+  }
+
+  const host = window.location.hostname || "localhost";
+  pushCandidate(`http://${host}:8080`);
+  pushCandidate("http://localhost:8080");
+  pushCandidate("http://127.0.0.1:8080");
+
+  return candidates;
+}
+
+async function apiFetch(path, options) {
+  const normalizedPath = String(path || "");
+  const candidates = [API_BASE, ...API_BASE_CANDIDATES.filter((candidate) => candidate !== API_BASE)];
+  let lastError = null;
+  let lastResponse = null;
+
+  for (const base of candidates) {
+    try {
+      const response = await fetch(`${base}${normalizedPath}`, options);
+      if (!response.ok && base !== candidates[candidates.length - 1]) {
+        lastResponse = response;
+        continue;
+      }
+
+      API_BASE = base;
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastResponse) {
+    return lastResponse;
+  }
+
+  throw lastError || new Error("Unable to reach backend API.");
 }
 
 function attachEvents() {
@@ -127,8 +181,8 @@ function attachEvents() {
 async function refreshPortfolioState() {
   try {
     const [portfoliosResponse, balanceResponse] = await Promise.all([
-      fetch(`${API_BASE}/api/portfolios`),
-      fetch(`${API_BASE}/api/balance`)
+      apiFetch("/api/portfolios"),
+      apiFetch("/api/balance")
     ]);
 
     if (!portfoliosResponse.ok) {
@@ -292,7 +346,7 @@ async function onAddMoneySubmit(event) {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/balance/add`, {
+    const response = await apiFetch("/api/balance/add", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount })
@@ -363,7 +417,7 @@ async function onHoldingAdd(event) {
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/portfolios`, {
+    const response = await apiFetch("/api/portfolios", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -436,10 +490,11 @@ async function lookupAndFillCurrentPrice() {
   }
 
   const token = ++state.priceLookupToken;
+  const marketSymbol = normalizeMarketSymbol(assetType, ticker);
   setPriceLookupStatus(`Fetching ${assetType.toLowerCase()} price for ${ticker}...`);
 
   try {
-    const nextPrice = await fetchMarketPrice(assetType, ticker);
+    const nextPrice = await fetchMarketPrice(assetType, marketSymbol);
     if (token !== state.priceLookupToken) {
       return;
     }
@@ -525,7 +580,7 @@ async function onHoldingRemove(event) {
 
   try {
     if (quantityToRemove === holding.quantity) {
-      const response = await fetch(`${API_BASE}/api/portfolios/${holding.id}`, {
+      const response = await apiFetch(`/api/portfolios/${holding.id}`, {
         method: "DELETE"
       });
 
@@ -533,7 +588,7 @@ async function onHoldingRemove(event) {
         throw new Error(await readApiError(response));
       }
     } else {
-      const response = await fetch(`${API_BASE}/api/portfolios/${holding.id}`, {
+      const response = await apiFetch(`/api/portfolios/${holding.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPortfolioPayload(holding, {
@@ -570,7 +625,7 @@ async function onRefreshPrices() {
           continue;
         }
 
-        const response = await fetch(`${API_BASE}/api/portfolios/${holding.id}`, {
+        const response = await apiFetch(`/api/portfolios/${holding.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildPortfolioPayload(holding, { currentPrice: nextPrice }))
@@ -619,7 +674,7 @@ async function fetchMarketPrice(assetType, symbol) {
   }
 
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`);
+    const response = await apiFetch(endpoint);
     if (response.ok) {
       const payload = await parseApiPayload(response);
       const directPrice = extractNumericPrice(payload);
@@ -637,7 +692,7 @@ async function fetchMarketPrice(assetType, symbol) {
   }
 
   try {
-    const quoteResponse = await fetch(`${API_BASE}${quoteEndpoint}`);
+    const quoteResponse = await apiFetch(quoteEndpoint);
     if (!quoteResponse.ok) {
       return 0;
     }
@@ -748,11 +803,20 @@ function extractNumericPrice(payload, fields = []) {
 }
 
 function toMarketSymbol(holding) {
-  if ((holding.assetType || "").toLowerCase() !== "crypto") {
-    return holding.ticker;
+  return normalizeMarketSymbol(holding.assetType, holding.ticker);
+}
+
+function normalizeMarketSymbol(assetType, symbol) {
+  const normalizedSymbol = String(symbol || "").trim().toUpperCase();
+  if (!normalizedSymbol) {
+    return "";
   }
 
-  return holding.ticker.includes("-") ? holding.ticker : `${holding.ticker}-USD`;
+  if (normalizeAssetType(assetType) !== "Crypto") {
+    return normalizedSymbol;
+  }
+
+  return normalizedSymbol.includes("-") ? normalizedSymbol : `${normalizedSymbol}-USD`;
 }
 
 function buildPortfolioPayload(holding, overrides = {}) {
@@ -835,7 +899,6 @@ function renderTable() {
     setCell(clone, "quantity", formatNumber(holding.quantity, 0));
     setCell(clone, "avgPrice", formatCurrency(holding.avgPrice));
     setCell(clone, "currentPrice", formatCurrency(holding.currentPrice));
-    setCell(clone, "purchaseDate", holding.purchaseDate ? formatDate(holding.purchaseDate) : "-");
 
     const pnlCell = setCell(clone, "pnl", formatCurrency(pnl));
     pnlCell.classList.add(pnl >= 0 ? "positive" : "negative");
