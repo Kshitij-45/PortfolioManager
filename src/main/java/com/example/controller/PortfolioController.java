@@ -1,8 +1,11 @@
 package com.example.controller;
 
 import com.example.dto.PortfolioDTO;
+import com.example.dto.ProfitSummaryDTO;
 import com.example.entity.Portfolio;
+import com.example.entity.PortfolioHistory;
 import com.example.service.PortfolioService;
+import com.example.service.PortfolioHistoryService;
 
 import jakarta.validation.Valid;
 
@@ -28,9 +31,12 @@ import java.util.List;
 public class PortfolioController {
 
     private final PortfolioService portfolioService;
+    private final PortfolioHistoryService portfolioHistoryService;
 
-    public PortfolioController(PortfolioService portfolioService) {
+    public PortfolioController(PortfolioService portfolioService,
+                               PortfolioHistoryService portfolioHistoryService) {
         this.portfolioService = portfolioService;
+        this.portfolioHistoryService = portfolioHistoryService;
     }
 
     // GET all portfolios
@@ -79,5 +85,19 @@ public class PortfolioController {
     @GetMapping("/balance")
     public ResponseEntity<Double> getAvailableBalance() {
         return ResponseEntity.ok(portfolioService.getAvailableBalance());
+    }
+
+    // GET full history snapshots for one portfolio entry
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<PortfolioHistory>> getPortfolioHistory(@PathVariable Integer id) {
+        List<PortfolioHistory> history = portfolioHistoryService.getHistoryForPortfolio(id);
+        return ResponseEntity.ok(history);
+    }
+
+    // GET total profit per day across all holdings — for the line graph
+    @GetMapping("/history/summary")
+    public ResponseEntity<List<ProfitSummaryDTO>> getDailyProfitSummary() {
+        List<ProfitSummaryDTO> summary = portfolioHistoryService.getDailyProfitSummary();
+        return ResponseEntity.ok(summary);
     }
 }

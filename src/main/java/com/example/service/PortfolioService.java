@@ -25,10 +25,14 @@ public class PortfolioService {
 
     private final PortfolioRepository portfolioRepository;
     private final BalanceService balanceService;
+    private final PortfolioHistoryService portfolioHistoryService;
 
-    public PortfolioService(PortfolioRepository portfolioRepository, BalanceService balanceService) {
+    public PortfolioService(PortfolioRepository portfolioRepository,
+                            BalanceService balanceService,
+                            PortfolioHistoryService portfolioHistoryService) {
         this.portfolioRepository = portfolioRepository;
         this.balanceService = balanceService;
+        this.portfolioHistoryService = portfolioHistoryService;
     }
 
     public Portfolio createPortfolio(PortfolioDTO portfolioDTO) {
@@ -101,6 +105,7 @@ public class PortfolioService {
         portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
         Portfolio saved = portfolioRepository.save(portfolio);
         saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
+        portfolioHistoryService.recordSnapshot(saved);
         return saved;
     }
 
@@ -115,6 +120,7 @@ public class PortfolioService {
             creditBalance(amountToRefund);
         }
 
+        portfolioHistoryService.deleteHistoryForPortfolio(id);
         portfolioRepository.deleteById(id);
     }
 
