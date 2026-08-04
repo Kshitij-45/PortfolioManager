@@ -112,6 +112,21 @@ public abstract class BaseMarketDataService {
         return (n != null && !n.isNull() && n.isNumber()) ? n.decimalValue() : null;
     }
 
+    protected BigDecimal firstDecimal(JsonNode node, String... fields) {
+        if (node == null || fields == null) {
+            return null;
+        }
+
+        for (String field : fields) {
+            BigDecimal value = decimalOrNull(node, field);
+            if (value != null && value.compareTo(BigDecimal.ZERO) > 0) {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
     protected Long longOrNull(JsonNode node, String field) {
         JsonNode n = node.get(field);
         return (n != null && !n.isNull() && n.isNumber()) ? n.longValue() : null;

@@ -55,8 +55,8 @@ public class MutualFundService extends BaseMarketDataService {
     }
 
     private MutualFundQuoteDTO mapToDTO(JsonNode meta) {
-        BigDecimal nav     = decimalOrNull(meta, "regularMarketPrice");
-        BigDecimal prevNav = decimalOrNull(meta, "chartPreviousClose");
+        BigDecimal prevNav = firstDecimal(meta, "chartPreviousClose", "regularMarketPreviousClose");
+        BigDecimal nav     = firstDecimal(meta, "regularMarketPrice", "regularMarketPreviousClose", "chartPreviousClose");
         BigDecimal change  = computeChange(nav, prevNav);
         BigDecimal pct     = computeChangePercent(change, prevNav);
 

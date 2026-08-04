@@ -23,7 +23,7 @@ public class CryptoService extends BaseMarketDataService {
      * Use Yahoo Finance format: BTC-USD, ETH-USD, SOL-USD, BNB-USD, etc.
      */
     public CryptoQuoteDTO getQuote(String symbol) {
-        String upperSymbol = normalizeSymbol(symbol, "crypto");
+        String upperSymbol = normalizeCryptoSymbol(symbol);
         JsonNode meta = fetchChartMeta(upperSymbol);
         if (meta == null || meta.isMissingNode()) {
             throw new AssetNotFoundException("Crypto", upperSymbol);
@@ -54,9 +54,14 @@ public class CryptoService extends BaseMarketDataService {
         return results;
     }
 
+    private String normalizeCryptoSymbol(String symbol) {
+        String normalized = normalizeSymbol(symbol, "crypto");
+        return normalized.contains("-") ? normalized : normalized + "-USD";
+    }
+
     private CryptoQuoteDTO mapToDTO(JsonNode meta) {
-        BigDecimal price     = decimalOrNull(meta, "regularMarketPrice");
-        BigDecimal prevClose = decimalOrNull(meta, "chartPreviousClose");
+        BigDecimal prevClose = firstDecimal(meta, "chartPreviousClose", "regularMarketPreviousClose");
+        BigDecimal price     = firstDecimal(meta, "regularMarketPrice", "regularMarketPreviousClose", "chartPreviousClose");
         BigDecimal change    = computeChange(price, prevClose);
         BigDecimal changePct = computeChangePercent(change, prevClose);
 

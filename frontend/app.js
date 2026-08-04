@@ -15,6 +15,7 @@ function resolveApiBase() {
 }
 
 const API_BASE = resolveApiBase();
+const PRICE_LOOKUP_DEBOUNCE_MS = 350;
 
 const COLORS = ["#7a5b36", "#a67c52", "#c79d6d", "#5f6f52", "#8c5a44", "#bba07a"];
 
@@ -22,6 +23,8 @@ const state = {
   holdings: [],
   history: [],
   balance: 0,
+  priceLookupToken: 0,
+  priceLookupTimer: null,
   view: {
     search: "",
     type: "All",
@@ -66,6 +69,7 @@ const ui = {
   holdingsTypeFilter: document.getElementById("holdingsTypeFilter"),
   holdingsSort: document.getElementById("holdingsSort"),
   holdingFormError: document.getElementById("holdingFormError"),
+  holdingPriceStatus: document.getElementById("holdingPriceStatus"),
   allocationChart: document.getElementById("allocationChart"),
   allocationLegend: document.getElementById("allocationLegend"),
   historyChart: document.getElementById("historyChart")
@@ -91,6 +95,9 @@ function attachEvents() {
   ui.addMoneyModal.addEventListener("click", onModalClick);
 
   ui.holdingForm.addEventListener("submit", onHoldingAdd);
+  ui.holdingForm.elements.ticker.addEventListener("input", onHoldingLookupInput);
+  ui.holdingForm.elements.assetType.addEventListener("change", onHoldingLookupInput);
+  ui.holdingForm.elements.avgPrice.addEventListener("input", onAvgPriceInput);
   ui.removeHoldingForm.addEventListener("submit", onHoldingRemove);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
 
@@ -180,6 +187,8 @@ function openAddAssetModal() {
   closeAddMoneyModal();
   closeRemoveAssetModal();
   clearHoldingFormError();
+  applyTodayPurchaseDate();
+  clearPriceLookupStatus();
   ui.addAssetModal.classList.remove("hidden");
   ui.addAssetModal.setAttribute("aria-hidden", "false");
   updateModalBodyState();
@@ -325,12 +334,11 @@ async function onHoldingAdd(event) {
   const assetType = normalizeAssetType(String(formData.get("assetType") || "Other"));
   const quantity = Number.parseInt(String(formData.get("quantity") || "0"), 10);
   const avgPrice = Number(formData.get("avgPrice") || 0);
-  const currentPriceInput = Number(formData.get("currentPrice") || 0);
-  const currentPrice = currentPriceInput > 0 ? currentPriceInput : avgPrice;
-  const purchaseDate = String(formData.get("purchaseDate") || "");
+  const currentPrice = Number(formData.get("currentPrice") || 0);
+  const purchaseDate = getTodayDateValue();
 
-  if (!ticker || !companyName || !purchaseDate) {
-    setHoldingFormError("Symbol, company name, and purchase date are required.");
+  if (!ticker || !companyName) {
+    setHoldingFormError("Symbol and company name are required.");
     return;
   }
 
@@ -339,8 +347,19 @@ async function onHoldingAdd(event) {
     return;
   }
 
-  if (!Number.isFinite(avgPrice) || avgPrice <= 0 || !Number.isFinite(currentPrice) || currentPrice <= 0) {
-    setHoldingFormError("Buy price and current price must be greater than 0.");
+  if (!Number.isFinite(avgPrice) || avgPrice <= 0) {
+    setHoldingFormError("Buy price must be greater than 0.");
+    return;
+  }
+
+  if (assetType !== "Cash" && (!Number.isFinite(currentPrice) || currentPrice <= 0)) {
+    setHoldingFormError("Unable to fetch current market price. Check the symbol and try again.");
+    return;
+  }
+
+  const effectiveCurrentPrice = assetType === "Cash" ? avgPrice : currentPrice;
+  if (!Number.isFinite(effectiveCurrentPrice) || effectiveCurrentPrice <= 0) {
+    setHoldingFormError("Current price is not valid.");
     return;
   }
 
@@ -354,7 +373,7 @@ async function onHoldingAdd(event) {
         assetType,
         quantity,
         buyPrice: avgPrice,
-        currentPrice,
+        currentPrice: effectiveCurrentPrice,
         purchaseDate
       })
     });
@@ -368,6 +387,79 @@ async function onHoldingAdd(event) {
     await refreshPortfolioState();
   } catch (error) {
     setHoldingFormError(error.message);
+  }
+}
+
+function onHoldingLookupInput(event) {
+  const tickerInput = ui.holdingForm.elements.ticker;
+  if (event && event.target === tickerInput) {
+    tickerInput.value = tickerInput.value.toUpperCase().trimStart();
+  }
+
+  applyTodayPurchaseDate();
+
+  if (state.priceLookupTimer) {
+    window.clearTimeout(state.priceLookupTimer);
+  }
+
+  state.priceLookupTimer = window.setTimeout(() => {
+    void lookupAndFillCurrentPrice();
+  }, PRICE_LOOKUP_DEBOUNCE_MS);
+}
+
+function onAvgPriceInput() {
+  const assetType = normalizeAssetType(String(ui.holdingForm.elements.assetType.value || "Other"));
+  if (assetType !== "Cash") {
+    return;
+  }
+
+  const avgPrice = Number(ui.holdingForm.elements.avgPrice.value || 0);
+  if (Number.isFinite(avgPrice) && avgPrice > 0) {
+    ui.holdingForm.elements.currentPrice.value = avgPrice.toFixed(2);
+  }
+}
+
+async function lookupAndFillCurrentPrice() {
+  const ticker = String(ui.holdingForm.elements.ticker.value || "").trim().toUpperCase();
+  const assetType = normalizeAssetType(String(ui.holdingForm.elements.assetType.value || "Other"));
+  const currentPriceInput = ui.holdingForm.elements.currentPrice;
+
+  if (!ticker) {
+    currentPriceInput.value = "";
+    setPriceLookupStatus("Enter a symbol to fetch market price.");
+    return;
+  }
+
+  if (assetType === "Cash") {
+    onAvgPriceInput();
+    setPriceLookupStatus("Current price follows cost basis for cash.");
+    return;
+  }
+
+  const token = ++state.priceLookupToken;
+  setPriceLookupStatus(`Fetching ${assetType.toLowerCase()} price for ${ticker}...`);
+
+  try {
+    const nextPrice = await fetchMarketPrice(assetType, ticker);
+    if (token !== state.priceLookupToken) {
+      return;
+    }
+
+    if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+      currentPriceInput.value = "";
+      setPriceLookupStatus(`Price unavailable for ${ticker}.`);
+      return;
+    }
+
+    currentPriceInput.value = nextPrice.toFixed(2);
+    setPriceLookupStatus(`Live price loaded for ${ticker}.`);
+  } catch {
+    if (token !== state.priceLookupToken) {
+      return;
+    }
+
+    currentPriceInput.value = "";
+    setPriceLookupStatus(`Could not fetch price for ${ticker}.`);
   }
 }
 
@@ -511,31 +603,149 @@ async function onRefreshPrices() {
 
 async function fetchPriceForHolding(holding) {
   const symbol = toMarketSymbol(holding);
-  const type = (holding.assetType || "").toLowerCase();
+  const assetType = normalizeAssetType(holding.assetType);
 
-  if (type === "cash") {
+  if (assetType === "Cash") {
     return holding.currentPrice;
   }
 
-  let endpoint = "";
-  if (type === "bond") {
-    endpoint = `/api/bonds/${encodeURIComponent(symbol)}/price`;
-  } else if (type === "crypto") {
-    endpoint = `/api/crypto/${encodeURIComponent(symbol)}/price`;
-  } else if (type === "mutual fund") {
-    endpoint = `/api/funds/${encodeURIComponent(symbol)}/nav`;
-  } else {
-    endpoint = `/api/stocks/${encodeURIComponent(symbol)}/price`;
-  }
-
-  const response = await fetch(`${API_BASE}${endpoint}`);
-  if (!response.ok) {
-    return holding.currentPrice;
-  }
-
-  const payload = await response.json();
-  const price = Number(payload);
+  const price = await fetchMarketPrice(assetType, symbol);
   return Number.isFinite(price) && price > 0 ? price : holding.currentPrice;
+}
+
+async function fetchMarketPrice(assetType, symbol) {
+  const endpoint = getMarketPriceEndpoint(assetType, symbol);
+  if (!endpoint) {
+    return 0;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`);
+    if (response.ok) {
+      const payload = await parseApiPayload(response);
+      const directPrice = extractNumericPrice(payload);
+      if (Number.isFinite(directPrice) && directPrice > 0) {
+        return directPrice;
+      }
+    }
+  } catch {
+    // Fallback handled below.
+  }
+
+  const quoteEndpoint = getMarketQuoteEndpoint(assetType, symbol);
+  if (!quoteEndpoint) {
+    return 0;
+  }
+
+  try {
+    const quoteResponse = await fetch(`${API_BASE}${quoteEndpoint}`);
+    if (!quoteResponse.ok) {
+      return 0;
+    }
+
+    const quotePayload = await parseApiPayload(quoteResponse);
+    const quotePrice = extractNumericPrice(
+      quotePayload,
+      ["currentPrice", "nav", "regularMarketPrice", "price"]
+    );
+
+    return Number.isFinite(quotePrice) && quotePrice > 0 ? quotePrice : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function parseApiPayload(response) {
+  const raw = await response.text();
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function getMarketPriceEndpoint(assetType, symbol) {
+  if (!symbol) {
+    return "";
+  }
+
+  const encodedSymbol = encodeURIComponent(symbol);
+  if (assetType === "Bond") {
+    return `/api/bonds/${encodedSymbol}/price`;
+  }
+
+  if (assetType === "Crypto") {
+    return `/api/crypto/${encodedSymbol}/price`;
+  }
+
+  if (assetType === "Mutual Fund") {
+    return `/api/funds/${encodedSymbol}/nav`;
+  }
+
+  return `/api/stocks/${encodedSymbol}/price`;
+}
+
+function getMarketQuoteEndpoint(assetType, symbol) {
+  if (!symbol) {
+    return "";
+  }
+
+  const encodedSymbol = encodeURIComponent(symbol);
+  if (assetType === "Bond") {
+    return `/api/bonds/${encodedSymbol}`;
+  }
+
+  if (assetType === "Crypto") {
+    return `/api/crypto/${encodedSymbol}`;
+  }
+
+  if (assetType === "Mutual Fund") {
+    return `/api/funds/${encodedSymbol}`;
+  }
+
+  return `/api/stocks/${encodedSymbol}`;
+}
+
+function extractNumericPrice(payload, fields = []) {
+  if (typeof payload === "number") {
+    return payload;
+  }
+
+  if (typeof payload === "string") {
+    const parsed = Number(payload);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (payload && typeof payload === "object") {
+    for (const field of fields) {
+      if (Object.prototype.hasOwnProperty.call(payload, field)) {
+        const parsed = Number(payload[field]);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+
+    const parsed = Number(payload.value ?? payload.price ?? payload.currentPrice);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+
+    for (const value of Object.values(payload)) {
+      const nested = extractNumericPrice(value, fields);
+      if (Number.isFinite(nested) && nested > 0) {
+        return nested;
+      }
+    }
+
+    return 0;
+  }
+
+  return 0;
 }
 
 function toMarketSymbol(holding) {
@@ -842,6 +1052,28 @@ function setHoldingFormError(message) {
 
 function clearHoldingFormError() {
   ui.holdingFormError.textContent = "";
+}
+
+function setPriceLookupStatus(message) {
+  if (ui.holdingPriceStatus) {
+    ui.holdingPriceStatus.textContent = message;
+  }
+}
+
+function clearPriceLookupStatus() {
+  setPriceLookupStatus("");
+}
+
+function getTodayDateValue() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function applyTodayPurchaseDate() {
+  ui.holdingForm.elements.purchaseDate.value = getTodayDateValue();
 }
 
 function setAddMoneyFormError(message) {

@@ -54,8 +54,8 @@ public class StockService extends BaseMarketDataService {
     }
 
     private StockQuoteDTO mapMetaToDTO(JsonNode meta) {
-        BigDecimal price     = decimalOrNull(meta, "regularMarketPrice");
-        BigDecimal prevClose = decimalOrNull(meta, "chartPreviousClose");
+        BigDecimal prevClose = firstDecimal(meta, "chartPreviousClose", "regularMarketPreviousClose");
+        BigDecimal price     = firstDecimal(meta, "regularMarketPrice", "regularMarketPreviousClose", "chartPreviousClose");
         BigDecimal change    = computeChange(price, prevClose);
         BigDecimal changePct = computeChangePercent(change, prevClose);
 

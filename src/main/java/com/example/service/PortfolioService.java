@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -51,7 +52,8 @@ public class PortfolioService {
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
-        portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
+        // Enforce action date on create to keep purchase date system-driven.
+        portfolio.setPurchaseDate(LocalDate.now());
         Portfolio saved = portfolioRepository.save(portfolio);
         saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return saved;
