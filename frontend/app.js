@@ -26,6 +26,11 @@ const state = {
   balance: 0,
   priceLookupToken: 0,
   priceLookupTimer: null,
+  symbolPerformance: {
+    holding: null,
+    range: "1m",
+    points: []
+  },
   view: {
     search: "",
     type: "All",
@@ -49,6 +54,12 @@ const ui = {
   addMoneyAmountInput: document.getElementById("addMoneyAmountInput"),
   addMoneyFormError: document.getElementById("addMoneyFormError"),
   addMoneySubmit: document.getElementById("addMoneySubmit"),
+  symbolPerformanceModal: document.getElementById("symbolPerformanceModal"),
+  closeSymbolPerformanceModalBtn: document.getElementById("closeSymbolPerformanceModalBtn"),
+  symbolPerformanceTitle: document.getElementById("symbolPerformanceTitle"),
+  symbolPerformanceChart: document.getElementById("symbolPerformanceChart"),
+  symbolPerformanceStatus: document.getElementById("symbolPerformanceStatus"),
+  symbolRangeButtons: Array.from(document.querySelectorAll(".range-btn")),
   removeHoldingForm: document.getElementById("removeHoldingForm"),
   removeHoldingSelect: document.getElementById("removeHoldingSelect"),
   removeHoldingAvailable: document.getElementById("removeHoldingAvailable"),
@@ -154,6 +165,7 @@ function attachEvents() {
   ui.holdingForm.elements.avgPrice.addEventListener("input", onAvgPriceInput);
   ui.removeHoldingForm.addEventListener("submit", onHoldingRemove);
   ui.refreshPricesBtn.addEventListener("click", onRefreshPrices);
+  ui.holdingsBody.addEventListener("click", onHoldingsTableClick);
 
   ui.openAddPanelBtn.addEventListener("click", openAddAssetModal);
   if (ui.openAddFromHoldingsBtn) {
@@ -162,6 +174,12 @@ function attachEvents() {
 
   ui.closeAddAssetModalBtn.addEventListener("click", closeAddAssetModal);
   ui.addAssetModal.addEventListener("click", onModalClick);
+
+  ui.closeSymbolPerformanceModalBtn.addEventListener("click", closeSymbolPerformanceModal);
+  ui.symbolPerformanceModal.addEventListener("click", onModalClick);
+  ui.symbolRangeButtons.forEach((button) => {
+    button.addEventListener("click", onSymbolRangeClick);
+  });
 
   ui.jumpHoldingsBtn.addEventListener("click", openRemoveAssetModal);
   ui.closeRemoveAssetModalBtn.addEventListener("click", closeRemoveAssetModal);
@@ -300,7 +318,8 @@ function updateModalBodyState() {
   const addOpen = !ui.addAssetModal.classList.contains("hidden");
   const removeOpen = !ui.removeAssetModal.classList.contains("hidden");
   const moneyOpen = !ui.addMoneyModal.classList.contains("hidden");
-  document.body.classList.toggle("modal-open", addOpen || removeOpen || moneyOpen);
+  const performanceOpen = !ui.symbolPerformanceModal.classList.contains("hidden");
+  document.body.classList.toggle("modal-open", addOpen || removeOpen || moneyOpen || performanceOpen);
 }
 
 function onModalClick(event) {
@@ -317,6 +336,8 @@ function onModalClick(event) {
       closeRemoveAssetModal();
     } else if (modal === ui.addMoneyModal) {
       closeAddMoneyModal();
+    } else if (modal === ui.symbolPerformanceModal) {
+      closeSymbolPerformanceModal();
     }
   }
 }
@@ -333,6 +354,188 @@ function onGlobalKeyDown(event) {
   if (event.key === "Escape" && !ui.addMoneyModal.classList.contains("hidden")) {
     closeAddMoneyModal();
   }
+
+  if (event.key === "Escape" && !ui.symbolPerformanceModal.classList.contains("hidden")) {
+    closeSymbolPerformanceModal();
+  }
+}
+
+function onHoldingsTableClick(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const trigger = target.closest(".symbol-trigger");
+  if (!(trigger instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const holdingId = Number(trigger.dataset.holdingId || 0);
+  const holding = state.holdings.find((item) => item.id === holdingId);
+  if (!holding) {
+    return;
+  }
+
+  void openSymbolPerformanceModal(holding);
+}
+
+async function openSymbolPerformanceModal(holding) {
+  closeAddAssetModal();
+  closeRemoveAssetModal();
+  closeAddMoneyModal();
+
+  state.symbolPerformance.holding = holding;
+  state.symbolPerformance.range = "1m";
+  state.symbolPerformance.points = [];
+
+  ui.symbolPerformanceTitle.textContent = `${holding.ticker} Performance`;
+  ui.symbolPerformanceStatus.textContent = "";
+  ui.symbolPerformanceModal.classList.remove("hidden");
+  ui.symbolPerformanceModal.setAttribute("aria-hidden", "false");
+  setActiveRangeButton("1m");
+  renderSymbolPerformanceChart();
+  updateModalBodyState();
+
+  await loadSymbolPerformance("1m");
+}
+
+function closeSymbolPerformanceModal() {
+  ui.symbolPerformanceModal.classList.add("hidden");
+  ui.symbolPerformanceModal.setAttribute("aria-hidden", "true");
+  ui.symbolPerformanceStatus.textContent = "";
+  updateModalBodyState();
+}
+
+function onSymbolRangeClick(event) {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const range = String(target.dataset.range || "").toLowerCase();
+  if (!range || range === state.symbolPerformance.range) {
+    return;
+  }
+
+  void loadSymbolPerformance(range);
+}
+
+function setActiveRangeButton(activeRange) {
+  for (const button of ui.symbolRangeButtons) {
+    button.classList.toggle("active", button.dataset.range === activeRange);
+  }
+}
+
+async function loadSymbolPerformance(range) {
+  const holding = state.symbolPerformance.holding;
+  if (!holding) {
+    return;
+  }
+
+  const safeRange = normalizePerformanceRange(range);
+  state.symbolPerformance.range = safeRange;
+  setActiveRangeButton(safeRange);
+  ui.symbolPerformanceStatus.textContent = `Loading ${holding.ticker} history (${safeRange.toUpperCase()})...`;
+
+  let usedSnapshotFallback = false;
+  let points = [];
+
+  try {
+    const response = await apiFetch(
+      `/api/stocks/${encodeURIComponent(holding.ticker)}/history?range=${encodeURIComponent(safeRange)}`
+    );
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response));
+    }
+
+    const payload = await response.json();
+    points = Array.isArray(payload)
+      ? payload
+        .map((point) => ({
+          date: String(point.date || "").trim(),
+          value: Number(point.closePrice)
+        }))
+        .filter((point) => point.date && Number.isFinite(point.value) && point.value > 0)
+      : [];
+  } catch (error) {
+    try {
+      points = await loadPortfolioSnapshotHistory(holding.id, safeRange);
+      usedSnapshotFallback = true;
+    } catch {
+      state.symbolPerformance.points = [];
+      renderSymbolPerformanceChart();
+      ui.symbolPerformanceStatus.textContent = `Unable to load price history: ${error.message}`;
+      return;
+    }
+  }
+
+  state.symbolPerformance.points = points;
+  renderSymbolPerformanceChart();
+
+  if (points.length === 0) {
+    ui.symbolPerformanceStatus.textContent = "No market data available for this range.";
+    return;
+  }
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const change = ((last.value - first.value) / first.value) * 100;
+  const suffix = usedSnapshotFallback ? " (from saved portfolio snapshots)" : "";
+  ui.symbolPerformanceStatus.textContent = `${formatRangeLabel(safeRange)} change: ${formatSignedPercent(change)} (${formatCurrency(first.value)} -> ${formatCurrency(last.value)})${suffix}`;
+}
+
+async function loadPortfolioSnapshotHistory(holdingId, range) {
+  const response = await apiFetch(`/api/portfolios/${holdingId}/history`);
+  if (!response.ok) {
+    throw new Error(await readApiError(response));
+  }
+
+  const payload = await response.json();
+  const points = Array.isArray(payload)
+    ? payload
+      .map((point) => ({
+        date: String(point.recordedDate || "").trim(),
+        value: Number(point.currentPrice)
+      }))
+      .filter((point) => point.date && Number.isFinite(point.value) && point.value > 0)
+    : [];
+
+  return filterPointsByRange(points, range);
+}
+
+function filterPointsByRange(points, range) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return [];
+  }
+
+  const days = range === "1w" ? 7 : range === "1y" ? 365 : 31;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const filtered = sorted.filter((point) => {
+    const stamp = new Date(`${point.date}T00:00:00`);
+    return !Number.isNaN(stamp.getTime()) && stamp >= cutoff;
+  });
+
+  return filtered.length > 0 ? filtered : sorted;
+}
+
+function normalizePerformanceRange(range) {
+  const normalized = String(range || "").trim().toLowerCase();
+  if (normalized === "1w" || normalized === "1m" || normalized === "1y") {
+    return normalized;
+  }
+
+  return "1m";
+}
+
+function formatRangeLabel(range) {
+  if (range === "1w") return "1W";
+  if (range === "1y") return "1Y";
+  return "1M";
 }
 
 async function onAddMoneySubmit(event) {
@@ -894,7 +1097,15 @@ function renderTable() {
     const marketValue = holding.quantity * holding.currentPrice;
     const pnl = marketValue - holding.quantity * holding.avgPrice;
 
-    setCell(clone, "ticker", holding.ticker);
+    const tickerCell = setCell(clone, "ticker", "");
+    const symbolButton = document.createElement("button");
+    symbolButton.type = "button";
+    symbolButton.className = "symbol-trigger";
+    symbolButton.dataset.holdingId = String(holding.id);
+    symbolButton.textContent = holding.ticker;
+    symbolButton.setAttribute("aria-label", `View ${holding.ticker} price performance chart`);
+    tickerCell.append(symbolButton);
+
     setCell(clone, "companyName", holding.companyName);
     setCell(clone, "quantity", formatNumber(holding.quantity, 0));
     setCell(clone, "avgPrice", formatCurrency(holding.avgPrice));
@@ -905,6 +1116,72 @@ function renderTable() {
 
     ui.holdingsBody.append(clone);
   }
+}
+
+function renderSymbolPerformanceChart() {
+  const ctx = ui.symbolPerformanceChart.getContext("2d");
+  const width = ui.symbolPerformanceChart.width;
+  const height = ui.symbolPerformanceChart.height;
+
+  ctx.clearRect(0, 0, width, height);
+
+  if (state.symbolPerformance.points.length === 0) {
+    drawSymbolNoData(ctx, width, height);
+    return;
+  }
+
+  const values = state.symbolPerformance.points.map((point) => point.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = Math.max(0.01, max - min);
+
+  const padding = { top: 20, right: 20, bottom: 30, left: 60 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  ctx.strokeStyle = "#d8cab6";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i += 1) {
+    const y = padding.top + (i / 4) * chartHeight;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "#7a5b36";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+
+  const pointCount = state.symbolPerformance.points.length;
+  state.symbolPerformance.points.forEach((point, index) => {
+    const x = pointCount === 1
+      ? padding.left + chartWidth / 2
+      : padding.left + (index / (pointCount - 1)) * chartWidth;
+    const y = padding.top + ((max - point.value) / range) * chartHeight;
+
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+
+  const firstPoint = state.symbolPerformance.points[0];
+  const lastPoint = state.symbolPerformance.points[pointCount - 1];
+  ctx.fillStyle = "#6e5d48";
+  ctx.font = "12px IBM Plex Mono";
+  ctx.fillText(formatCurrency(max), 6, padding.top + 4);
+  ctx.fillText(formatCurrency(min), 6, height - padding.bottom);
+  ctx.fillText(formatShortDate(firstPoint.date), padding.left, height - 8);
+  ctx.fillText(formatShortDate(lastPoint.date), width - 76, height - 8);
+}
+
+function drawSymbolNoData(ctx, width, height) {
+  ctx.fillStyle = "#6e5d48";
+  ctx.font = "15px Space Grotesk";
+  ctx.fillText("Click a range to load historical price data.", 20, height / 2);
 }
 
 function getVisibleHoldings() {

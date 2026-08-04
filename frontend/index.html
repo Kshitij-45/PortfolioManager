@@ -217,6 +217,23 @@
     </div>
   </div>
 
+  <div id="symbolPerformanceModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <div class="modal-card panel performance-modal-card" role="dialog" aria-modal="true" aria-labelledby="symbolPerformanceTitle">
+      <div class="modal-header">
+        <h2 id="symbolPerformanceTitle">Symbol Performance</h2>
+        <button id="closeSymbolPerformanceModalBtn" class="btn ghost" type="button" aria-label="Close symbol performance chart">Close</button>
+      </div>
+      <div class="performance-range-actions" role="tablist" aria-label="Performance range selectors">
+        <button type="button" class="range-btn active" data-range="1w">1W</button>
+        <button type="button" class="range-btn" data-range="1m">1M</button>
+        <button type="button" class="range-btn" data-range="1y">1Y</button>
+      </div>
+      <canvas id="symbolPerformanceChart" width="800" height="320" aria-label="Selected symbol performance chart"></canvas>
+      <p id="symbolPerformanceStatus" class="muted form-note"></p>
+    </div>
+  </div>
+
   <template id="holdingRowTemplate">
     <tr>
       <td data-key="ticker"></td>
@@ -228,6 +245,6 @@
     </tr>
   </template>
 
-  <script src="app.js?v=20260803b" defer></script>
+  <script src="app.js?v=20260804b" defer></script>
 </body>
 </html>

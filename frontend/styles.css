@@ -214,6 +214,22 @@ button.link-action {
   text-decoration: underline;
 }
 
+.symbol-trigger {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+}
+
+.symbol-trigger:hover {
+  color: #5f4425;
+}
+
 .holding-tools {
   margin-top: 0.42rem;
   display: grid;
@@ -426,6 +442,33 @@ canvas {
 
 .modal-form .modal-submit {
   align-self: end;
+}
+
+.performance-modal-card {
+  width: min(980px, 100%);
+}
+
+.performance-range-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.range-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: #6e5d48;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+}
+
+.range-btn.active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
 }
 
 .stack-form {
