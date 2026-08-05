@@ -40,24 +40,27 @@ public class PortfolioService {
         }
         validateAssetType(portfolioDTO.getAssetType());
 
+        String normalizedSymbol = normalizeSymbol(portfolioDTO.getSymbol());
+        String normalizedCompanyName = normalizeCompanyName(portfolioDTO.getCompanyName(), normalizedSymbol);
+
         BigDecimal requiredAmount = purchaseAmount(portfolioDTO.getAssetType(), portfolioDTO.getQuantity(), portfolioDTO.getBuyPrice());
         adjustBalanceForRequiredAmount(requiredAmount);
 
         Portfolio existing = portfolioRepository.findBySymbolAndPurchaseDate(
-            portfolioDTO.getSymbol(),
+            normalizedSymbol,
             portfolioDTO.getPurchaseDate())
                 .orElse(null);
 
         if (existing != null) {
-            Portfolio mergedPortfolio = mergePortfolio(existing, portfolioDTO);
+            Portfolio mergedPortfolio = mergePortfolio(existing, portfolioDTO, normalizedCompanyName);
             Portfolio saved = portfolioRepository.save(mergedPortfolio);
             saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
             return saved;
         }
 
         Portfolio portfolio = new Portfolio();
-        portfolio.setSymbol(portfolioDTO.getSymbol());
-        portfolio.setCompanyName(portfolioDTO.getCompanyName());
+        portfolio.setSymbol(normalizedSymbol);
+        portfolio.setCompanyName(normalizedCompanyName);
         portfolio.setAssetType(portfolioDTO.getAssetType());
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
@@ -68,11 +71,11 @@ public class PortfolioService {
         return saved;
     }
 
-    private Portfolio mergePortfolio(Portfolio existing, PortfolioDTO portfolioDTO) {
+    private Portfolio mergePortfolio(Portfolio existing, PortfolioDTO portfolioDTO, String normalizedCompanyName) {
         Portfolio portfolio = new Portfolio();
         portfolio.setId(existing.getId());
         portfolio.setSymbol(existing.getSymbol());
-        portfolio.setCompanyName(portfolioDTO.getCompanyName());
+        portfolio.setCompanyName(normalizedCompanyName);
         portfolio.setAssetType(existing.getAssetType());
         portfolio.setQuantity(existing.getQuantity() + portfolioDTO.getQuantity());
         portfolio.setBuyPrice(calculateWeightedBuyPrice(existing, portfolioDTO));
@@ -120,14 +123,20 @@ public class PortfolioService {
         Portfolio existing = portfolioRepository.findById(id)
                 .orElseThrow(() -> new PortfolioNotFoundException(id));
 
-        BigDecimal existingAmount = purchaseAmount(existing.getAssetType(), existing.getQuantity(), existing.getBuyPrice());
-        BigDecimal newAmount = purchaseAmount(portfolioDTO.getAssetType(), portfolioDTO.getQuantity(), portfolioDTO.getBuyPrice());
-        BigDecimal delta = newAmount.subtract(existingAmount);
+        int existingQty = existing.getQuantity() == null ? 0 : existing.getQuantity();
+        int requestedQty = portfolioDTO.getQuantity() == null ? 0 : portfolioDTO.getQuantity();
 
-        if (delta.compareTo(BigDecimal.ZERO) > 0) {
-            adjustBalanceForRequiredAmount(delta);
-        } else if (delta.compareTo(BigDecimal.ZERO) < 0) {
-            creditBalance(delta.abs());
+        if (requestedQty > existingQty) {
+            int purchasedQty = requestedQty - existingQty;
+            BigDecimal requiredAmount = purchaseAmount(
+                    existing.getAssetType(),
+                    purchasedQty,
+                    portfolioDTO.getBuyPrice());
+            adjustBalanceForRequiredAmount(requiredAmount);
+        } else if (requestedQty < existingQty) {
+            int soldQty = existingQty - requestedQty;
+            BigDecimal saleProceeds = saleAmount(soldQty, existing.getCurrentPrice());
+            creditBalance(saleProceeds);
         }
 
         Portfolio portfolio = new Portfolio();
@@ -150,9 +159,9 @@ public class PortfolioService {
         Portfolio existing = portfolioRepository.findById(id)
                 .orElseThrow(() -> new PortfolioNotFoundException(id));
 
-        BigDecimal amountToRefund = purchaseAmount(existing.getAssetType(), existing.getQuantity(), existing.getBuyPrice());
-        if (amountToRefund.compareTo(BigDecimal.ZERO) > 0) {
-            creditBalance(amountToRefund);
+        BigDecimal saleProceeds = saleAmount(existing.getQuantity(), existing.getCurrentPrice());
+        if (saleProceeds.compareTo(BigDecimal.ZERO) > 0) {
+            creditBalance(saleProceeds);
         }
 
         portfolioHistoryService.deleteHistoryForPortfolio(id);
@@ -177,6 +186,12 @@ public class PortfolioService {
 
         BigDecimal qty = BigDecimal.valueOf(quantity == null ? 0 : quantity);
         BigDecimal price = BigDecimal.valueOf(buyPrice == null ? 0.0 : buyPrice);
+        return qty.multiply(price).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal saleAmount(Integer quantity, Double currentPrice) {
+        BigDecimal qty = BigDecimal.valueOf(quantity == null ? 0 : quantity);
+        BigDecimal price = BigDecimal.valueOf(currentPrice == null ? 0.0 : currentPrice);
         return qty.multiply(price).setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -215,5 +230,14 @@ public class PortfolioService {
         if (!SUPPORTED_ASSET_TYPES.contains(assetType.trim().toLowerCase())) {
             throw new UnsupportedAssetTypeException(assetType);
         }
+    }
+
+    private String normalizeSymbol(String symbol) {
+        return String.valueOf(symbol == null ? "" : symbol).trim().toUpperCase();
+    }
+
+    private String normalizeCompanyName(String companyName, String fallbackSymbol) {
+        String normalized = companyName == null ? "" : companyName.trim();
+        return normalized.isEmpty() ? fallbackSymbol + " Holdings" : normalized;
     }
 }

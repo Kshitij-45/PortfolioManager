@@ -55,9 +55,21 @@ public class PortfolioRepository {
     }
 
     private void ensurePurchaseDateColumn() {
-        // Works across MySQL and H2 without querying vendor-specific metadata schema names.
-        jdbcTemplate.execute("ALTER TABLE portfolio ADD COLUMN IF NOT EXISTS purchase_date DATE");
-        jdbcTemplate.execute("UPDATE portfolio SET purchase_date = CURRENT_DATE WHERE purchase_date IS NULL");
+        Integer columnCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'portfolio'
+                  AND column_name = 'purchase_date'
+                """,
+                Integer.class);
+
+        if (columnCount == null || columnCount == 0) {
+            jdbcTemplate.execute("ALTER TABLE portfolio ADD COLUMN purchase_date DATE");
+            jdbcTemplate.execute("UPDATE portfolio SET purchase_date = CURRENT_DATE WHERE purchase_date IS NULL");
+            jdbcTemplate.execute("ALTER TABLE portfolio MODIFY purchase_date DATE NOT NULL");
+        }
     }
 
     // Get All Assets

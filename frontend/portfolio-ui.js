@@ -774,7 +774,12 @@ function buildRecommendationCard(item) {
   reasonList.className = "rec-reasons";
   for (const reason of reasons) {
     const li = document.createElement("li");
-    li.textContent = String(reason || "");
+    const reasonText = String(reason || "");
+    if (reasonText.startsWith("AI insight:")) {
+      li.innerHTML = `<span class="ai-insight-label">AI insight:</span>${escapeHtml(reasonText.slice("AI insight:".length))}`;
+    } else {
+      li.textContent = reasonText;
+    }
     reasonList.append(li);
   }
 

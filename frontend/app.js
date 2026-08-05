@@ -42,6 +42,57 @@ const CHART_HOVER_STATE = {
   tooltip: null
 };
 
+const HOME_SPOTLIGHT_CONTENT = {
+  tracking: {
+    title: "Portfolio Tracking",
+    text: "Keep all holdings in one place, manage asset entries, and track total balance with a focused dashboard layout built for daily monitoring.",
+    items: [
+      "Monitor holdings table, cash balance, and asset totals.",
+      "Quickly add, update, or sell assets from the dashboard.",
+      "Different asset classes remain visually separated."
+    ],
+    mediaClass: "home-spotlight-media-tracking",
+    metric: "Tracking",
+    metricSub: "Holdings and balance workflow"
+  },
+  market: {
+    title: "Market Data",
+    text: "The platform uses Yahoo Finance endpoints to load prices and historical series, helping your portfolio stay aligned with current market movement.",
+    items: [
+      "Refresh asset prices with live market data.",
+      "Support stock, bond, fund, and crypto lookups.",
+      "Use recent history to power trend charts."
+    ],
+    mediaClass: "home-spotlight-media-market",
+    metric: "Market",
+    metricSub: "Live prices and history signals"
+  },
+  performance: {
+    title: "Performance Insights",
+    text: "Allocation and line charts turn raw holding data into a clearer view of profit, loss, distribution, and portfolio behavior over time.",
+    items: [
+      "See allocation split across major asset types.",
+      "Track portfolio movement with visual trend charts.",
+      "Open symbol-level history for deeper inspection."
+    ],
+    mediaClass: "home-spotlight-media-performance",
+    metric: "Performance",
+    metricSub: "Portfolio movement and trend view"
+  },
+  ai: {
+    title: "AI Suggestions",
+    text: "Recommendation cards combine technical signals with AI-assisted insight so users can compare opportunities and understand why a suggestion appears.",
+    items: [
+      "Explore ranked suggestions across multiple categories.",
+      "Review confidence, risk, and AI insight labels.",
+      "Use insights as decision support, not just raw numbers."
+    ],
+    mediaClass: "home-spotlight-media-ai",
+    metric: "AI Focus",
+    metricSub: "Suggestions with supporting rationale"
+  }
+};
+
 const state = {
   holdings: [],
   history: [],
@@ -75,9 +126,19 @@ const state = {
 };
 
 const ui = {
+  viewLinks: Array.from(document.querySelectorAll(".view-link")),
+  homeSpotlightTabs: Array.from(document.querySelectorAll(".home-spotlight-tab")),
   navLinks: Array.from(document.querySelectorAll(".nav-link")),
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   themeToggleIcon: document.querySelector("#themeToggleBtn .theme-icon"),
+  homeSection: document.getElementById("homeSection"),
+  homeSpotlightTitle: document.getElementById("homeSpotlightTitle"),
+  homeSpotlightText: document.getElementById("homeSpotlightText"),
+  homeSpotlightList: document.getElementById("homeSpotlightList"),
+  homeSpotlightMedia: document.getElementById("homeSpotlightMedia"),
+  homeSpotlightMetric: document.getElementById("homeSpotlightMetric"),
+  homeSpotlightMetricSub: document.getElementById("homeSpotlightMetricSub"),
+  dashboardView: document.getElementById("dashboardView"),
   holdingForm: document.getElementById("holdingForm"),
   openAddMoneyModalBtn: document.getElementById("openAddMoneyModalBtn"),
   openAddPanelBtn: document.getElementById("openAddPanelBtn"),
@@ -111,10 +172,10 @@ const ui = {
   headerTotalValue: document.getElementById("headerTotalValue"),
   headerReturn: document.getElementById("headerReturn"),
   headerAvailableBalance: document.getElementById("headerAvailableBalance"),
-  cashValue: document.getElementById("cashValue"),
-  stocksValue: document.getElementById("stocksValue"),
-  bondsValue: document.getElementById("bondsValue"),
-  cryptoValue: document.getElementById("cryptoValue"),
+  assetSummaryViewport: document.getElementById("assetSummaryViewport"),
+  assetSummaryPrevBtn: document.getElementById("assetSummaryPrevBtn"),
+  assetSummaryNextBtn: document.getElementById("assetSummaryNextBtn"),
+  assetSummaryGrid: document.getElementById("assetSummaryGrid"),
   holdingsSearch: document.getElementById("holdingsSearch"),
   holdingsTypeFilter: document.getElementById("holdingsTypeFilter"),
   holdingsSort: document.getElementById("holdingsSort"),
@@ -139,9 +200,38 @@ init();
 async function init() {
   initTheme();
   attachEvents(onThemeToggle);
+  ensureStartingView();
+  resetHoldingsViewControls();
+  renderHomeSpotlight("tracking");
   ui.removeQuantityInput.step = "1";
   ui.removeQuantityInput.min = "1";
   await Promise.all([refreshPortfolioState(), refreshRecommendations()]);
+}
+
+function resetHoldingsViewControls() {
+  if (ui.holdingsSearch) {
+    ui.holdingsSearch.value = "";
+  }
+
+  if (ui.holdingsTypeFilter) {
+    ui.holdingsTypeFilter.value = "All";
+  }
+
+  if (ui.holdingsSort) {
+    ui.holdingsSort.value = "valueDesc";
+  }
+
+  state.view.search = "";
+  state.view.type = "All";
+  state.view.sort = "valueDesc";
+}
+
+function ensureStartingView() {
+  if (!window.location.hash) {
+    window.location.hash = "#homeSection";
+  } else {
+    syncActiveNavFromHash();
+  }
 }
 
 function buildApiBaseCandidates() {
@@ -202,6 +292,14 @@ function attachEvents() {
     ui.themeToggleBtn.addEventListener("click", onThemeToggle);
   }
 
+  for (const link of ui.viewLinks) {
+    link.addEventListener("click", onViewNavClick);
+  }
+
+  for (const button of ui.homeSpotlightTabs) {
+    button.addEventListener("click", onHomeSpotlightClick);
+  }
+
   for (const link of ui.navLinks) {
     link.addEventListener("click", onSidebarNavClick);
   }
@@ -241,6 +339,23 @@ function attachEvents() {
   ui.holdingsSearch.addEventListener("input", onViewControlChange);
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
+
+  if (ui.assetSummaryPrevBtn) {
+    ui.assetSummaryPrevBtn.addEventListener("click", () => {
+      scrollAssetSummary("prev");
+    });
+  }
+
+  if (ui.assetSummaryNextBtn) {
+    ui.assetSummaryNextBtn.addEventListener("click", () => {
+      scrollAssetSummary("next");
+    });
+  }
+
+  if (ui.assetSummaryViewport) {
+    ui.assetSummaryViewport.addEventListener("scroll", updateAssetSummaryControls, { passive: true });
+    window.addEventListener("resize", updateAssetSummaryControls);
+  }
 
   if (ui.historyChart) {
     ui.historyChart.addEventListener("mousemove", onHistoryChartHover);
@@ -338,28 +453,33 @@ function safelyReadTheme() {
 
 async function refreshPortfolioState() {
   try {
-    const [portfoliosResponse, balanceResponse] = await Promise.all([
-      apiFetch("/api/portfolios"),
-      apiFetch("/api/balance")
-    ]);
-
-    if (!portfoliosResponse.ok) {
-      throw new Error(await readApiError(portfoliosResponse));
-    }
-
-    if (!balanceResponse.ok) {
-      throw new Error(await readApiError(balanceResponse));
-    }
-
-    const portfolios = await portfoliosResponse.json();
-    const balance = await balanceResponse.json();
+    const portfolios = await fetchPortfoliosWithRetry();
 
     state.holdings = Array.isArray(portfolios)
-      ? portfolios.map(normalizeHolding).filter(Boolean)
+      ? portfolios
+          .map((holding, index) => normalizeHolding(holding, index))
+          .filter(Boolean)
       : [];
-    state.balance = Number(balance && balance.availableBalance);
-    if (!Number.isFinite(state.balance) || state.balance < 0) {
-      state.balance = 0;
+
+    try {
+      const balanceResponse = await apiFetch("/api/balance", {
+        cache: "no-store"
+      });
+      if (!balanceResponse.ok) {
+        throw new Error(await readApiError(balanceResponse));
+      }
+
+      const balance = await balanceResponse.json();
+      state.balance = Number(balance && balance.availableBalance);
+      if (!Number.isFinite(state.balance) || state.balance < 0) {
+        state.balance = 0;
+      }
+
+      clearHoldingFormError();
+    } catch (balanceError) {
+      // Keep holdings visible even if balance endpoint is temporarily unavailable.
+      state.balance = Number.isFinite(state.balance) ? state.balance : 0;
+      setHoldingFormError(`Holdings loaded. Balance unavailable: ${balanceError.message}`);
     }
 
     rebuildPerformanceHistory();
@@ -367,11 +487,39 @@ async function refreshPortfolioState() {
     renderAll();
   } catch (error) {
     setHoldingFormError(`Unable to load backend data: ${error.message}`);
-    state.holdings = [];
-    state.balance = 0;
-    state.history = [];
+    // Preserve previously loaded data so refresh failures do not blank the dashboard.
     renderAll();
   }
+}
+
+async function fetchPortfoliosWithRetry(maxAttempts = 3) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await apiFetch("/api/portfolios", {
+        cache: "no-store"
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response));
+      }
+
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        await waitForMs(250 * attempt);
+      }
+    }
+  }
+
+  throw lastError || new Error("Unable to load portfolio holdings.");
+}
+
+function waitForMs(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function onSidebarNavClick(event) {
@@ -382,15 +530,96 @@ function onSidebarNavClick(event) {
   setActiveNav(target.getAttribute("href") || "");
 }
 
+function onViewNavClick(event) {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLAnchorElement)) {
+    return;
+  }
+  setActiveNav(target.getAttribute("href") || "");
+}
+
+function onHomeSpotlightClick(event) {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  renderHomeSpotlight(target.dataset.homeFeature || "tracking");
+}
+
 function syncActiveNavFromHash() {
-  const currentHash = window.location.hash || "#dashboardSection";
+  const currentHash = window.location.hash || "#homeSection";
   setActiveNav(currentHash);
 }
 
 function setActiveNav(hash) {
+  const normalizedHash = hash || "#homeSection";
+  const isHomeView = normalizedHash === "#homeSection" || normalizedHash === "#home";
+
+  for (const link of ui.viewLinks) {
+    const href = link.getAttribute("href") || "";
+    const isDashboardLink = href === "#dashboardSection";
+    link.classList.toggle("active", isHomeView ? href === "#homeSection" : isDashboardLink);
+  }
+
   for (const link of ui.navLinks) {
     const href = link.getAttribute("href") || "";
-    link.classList.toggle("active", href === hash);
+    link.classList.toggle("active", !isHomeView && href === normalizedHash);
+  }
+
+  if (ui.homeSection) {
+    ui.homeSection.hidden = !isHomeView;
+  }
+
+  if (ui.dashboardView) {
+    ui.dashboardView.hidden = isHomeView;
+  }
+
+  document.body.classList.toggle("home-active", isHomeView);
+  document.body.classList.toggle("dashboard-active", !isHomeView);
+
+  if (!isHomeView && state.holdings.length === 0) {
+    void refreshPortfolioState();
+  }
+}
+
+function renderHomeSpotlight(featureKey) {
+  const normalizedKey = Object.prototype.hasOwnProperty.call(HOME_SPOTLIGHT_CONTENT, featureKey)
+    ? featureKey
+    : "tracking";
+  const content = HOME_SPOTLIGHT_CONTENT[normalizedKey];
+
+  ui.homeSpotlightTabs.forEach((button) => {
+    button.classList.toggle("active", button.dataset.homeFeature === normalizedKey);
+  });
+
+  if (ui.homeSpotlightTitle) {
+    ui.homeSpotlightTitle.textContent = content.title;
+  }
+
+  if (ui.homeSpotlightText) {
+    ui.homeSpotlightText.textContent = content.text;
+  }
+
+  if (ui.homeSpotlightList) {
+    ui.homeSpotlightList.innerHTML = "";
+    for (const item of content.items) {
+      const li = document.createElement("li");
+      li.textContent = item;
+      ui.homeSpotlightList.append(li);
+    }
+  }
+
+  if (ui.homeSpotlightMedia) {
+    ui.homeSpotlightMedia.className = `home-spotlight-media ${content.mediaClass}`;
+  }
+
+  if (ui.homeSpotlightMetric) {
+    ui.homeSpotlightMetric.textContent = content.metric;
+  }
+
+  if (ui.homeSpotlightMetricSub) {
+    ui.homeSpotlightMetricSub.textContent = content.metricSub;
   }
 }
 
@@ -895,7 +1124,12 @@ function buildRecommendationCard(item) {
   reasonList.className = "rec-reasons";
   for (const reason of reasons) {
     const li = document.createElement("li");
-    li.textContent = String(reason || "");
+    const reasonText = String(reason || "");
+    if (reasonText.startsWith("AI insight:")) {
+      li.innerHTML = `<span class="ai-insight-label">AI insight:</span>${escapeHtml(reasonText.slice("AI insight:".length))}`;
+    } else {
+      li.textContent = reasonText;
+    }
     reasonList.append(li);
   }
 
@@ -1470,18 +1704,11 @@ function renderSummary() {
   const pnl = totalValue - totalCost;
   const returnPct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
 
-  const byType = { Stock: 0, Bond: 0, Crypto: 0 };
+  const byType = {};
   for (const holding of state.holdings) {
     const value = holding.quantity * holding.currentPrice;
-    const normalizedType = (holding.assetType || "").toLowerCase();
-
-    if (normalizedType === "bond") {
-      byType.Bond += value;
-    } else if (normalizedType === "crypto") {
-      byType.Crypto += value;
-    } else {
-      byType.Stock += value;
-    }
+    const type = normalizeAssetType(holding.assetType);
+    byType[type] = (byType[type] || 0) + value;
   }
 
   ui.headerTotalValue.textContent = formatCurrency(totalValue);
@@ -1489,10 +1716,89 @@ function renderSummary() {
   ui.headerReturn.style.color = returnPct >= 0 ? "var(--good)" : "var(--bad)";
   ui.headerAvailableBalance.textContent = formatCurrency(state.balance);
 
-  ui.cashValue.textContent = formatCurrency(state.balance);
-  ui.stocksValue.textContent = formatCurrency(byType.Stock);
-  ui.bondsValue.textContent = formatCurrency(byType.Bond);
-  ui.cryptoValue.textContent = formatCurrency(byType.Crypto);
+  renderAssetSummaryCards(byType);
+}
+
+function renderAssetSummaryCards(byType) {
+  if (!ui.assetSummaryGrid) {
+    return;
+  }
+
+  ui.assetSummaryGrid.innerHTML = "";
+
+  const fragment = document.createDocumentFragment();
+  fragment.append(buildSummaryCard("Cash", "Cash Balance", state.balance, 1));
+
+  const entries = Object.entries(byType)
+    .filter(([type]) => type !== "Cash")
+    .sort((a, b) => b[1] - a[1]);
+
+  for (const [index, [type, value]] of entries.entries()) {
+    fragment.append(buildSummaryCard(type, `${type} Value`, value, index + 2));
+  }
+
+  ui.assetSummaryGrid.append(fragment);
+  window.requestAnimationFrame(updateAssetSummaryControls);
+}
+
+function scrollAssetSummary(direction) {
+  if (!ui.assetSummaryViewport) {
+    return;
+  }
+
+  const delta = Math.max(220, Math.floor(ui.assetSummaryViewport.clientWidth * 0.8));
+  const left = direction === "prev"
+    ? ui.assetSummaryViewport.scrollLeft - delta
+    : ui.assetSummaryViewport.scrollLeft + delta;
+
+  ui.assetSummaryViewport.scrollTo({
+    left,
+    behavior: "smooth"
+  });
+}
+
+function updateAssetSummaryControls() {
+  if (!ui.assetSummaryViewport || !ui.assetSummaryPrevBtn || !ui.assetSummaryNextBtn) {
+    return;
+  }
+
+  const maxScrollLeft = Math.max(0, ui.assetSummaryViewport.scrollWidth - ui.assetSummaryViewport.clientWidth);
+  const current = ui.assetSummaryViewport.scrollLeft;
+  const epsilon = 2;
+
+  ui.assetSummaryPrevBtn.disabled = current <= epsilon;
+  ui.assetSummaryNextBtn.disabled = current >= maxScrollLeft - epsilon;
+}
+
+function buildSummaryCard(assetType, label, value, toneIndex = 1) {
+  const card = document.createElement("article");
+  const normalizedType = String(assetType || "other").trim().toLowerCase().replace(/\s+/g, "-");
+  const typeClass = `asset-type-${normalizedType}`;
+  const toneClass = `summary-tone-${((Math.max(1, toneIndex) - 1) % 8) + 1}`;
+  card.className = `panel mini-card ${typeClass} ${toneClass}`;
+
+  const iconType = assetTypeToIconType(assetType);
+  card.innerHTML = `
+    <div class="mini-card-head">
+      <span class="mini-card-icon" aria-hidden="true">${buildAssetTypeIconSvg(iconType)}</span>
+      <p>${escapeHtml(label)}</p>
+    </div>
+    <h3>${formatCurrency(Number(value) || 0)}</h3>
+  `;
+
+  return card;
+}
+
+function assetTypeToIconType(assetType) {
+  const normalized = normalizeAssetType(assetType);
+
+  if (normalized === "Stock") return "stock";
+  if (normalized === "Bond") return "bond";
+  if (normalized === "Crypto") return "bitcoin";
+  if (normalized === "ETF") return "etf";
+  if (normalized === "Mutual Fund") return "fund";
+  if (normalized === "Cash") return "cash";
+  return "other";
 }
 
 function renderTable() {
@@ -2003,20 +2309,22 @@ function rebuildPerformanceHistory() {
   }));
 }
 
-function normalizeHolding(raw) {
+function normalizeHolding(raw, index = 0) {
   if (!raw) {
     return null;
   }
 
-  const id = Number(raw.id);
-  const ticker = String(raw.symbol || raw.ticker || "").trim().toUpperCase();
-  const quantity = Number(raw.quantity);
-  const avgPrice = Number(raw.buyPrice ?? raw.avgPrice ?? 0);
-  const currentPrice = Number(raw.currentPrice ?? avgPrice);
-
-  if (!Number.isInteger(id) || id <= 0 || !ticker || !Number.isInteger(quantity) || quantity <= 0) {
-    return null;
-  }
+  const parsedId = Number(raw.id);
+  const fallbackId = Date.now() + index + 1;
+  const id = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : fallbackId;
+  const rawTicker = String(raw.symbol || raw.ticker || "").trim().toUpperCase();
+  const ticker = rawTicker || `ASSET-${id}`;
+  const quantityValue = Number(raw.quantity);
+  const quantity = Number.isFinite(quantityValue) && quantityValue >= 0 ? quantityValue : 0;
+  const avgPriceValue = Number(raw.buyPrice ?? raw.avgPrice ?? 0);
+  const avgPrice = Number.isFinite(avgPriceValue) ? avgPriceValue : 0;
+  const currentPriceValue = Number(raw.currentPrice ?? avgPrice);
+  const currentPrice = Number.isFinite(currentPriceValue) ? currentPriceValue : avgPrice;
 
   return {
     id,
