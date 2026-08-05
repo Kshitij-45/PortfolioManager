@@ -2,7 +2,6 @@ package com.example.service;
 
 import com.example.exception.InvalidIdException;
 import com.example.exception.InvalidPortfolioException;
-import com.example.exception.InsufficientBalanceException;
 import com.example.exception.PortfolioNotFoundException;
 import com.example.exception.UnsupportedAssetTypeException;
 import com.example.dto.PortfolioDTO;
@@ -13,9 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.util.List;
 import java.util.Set;
+import java.util.List;
 
 @Service
 @Transactional
@@ -45,6 +43,18 @@ public class PortfolioService {
         BigDecimal requiredAmount = purchaseAmount(portfolioDTO.getAssetType(), portfolioDTO.getQuantity(), portfolioDTO.getBuyPrice());
         adjustBalanceForRequiredAmount(requiredAmount);
 
+        Portfolio existing = portfolioRepository.findBySymbolAndPurchaseDate(
+            portfolioDTO.getSymbol(),
+            portfolioDTO.getPurchaseDate())
+                .orElse(null);
+
+        if (existing != null) {
+            Portfolio mergedPortfolio = mergePortfolio(existing, portfolioDTO);
+            Portfolio saved = portfolioRepository.save(mergedPortfolio);
+            saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
+            return saved;
+        }
+
         Portfolio portfolio = new Portfolio();
         portfolio.setSymbol(portfolioDTO.getSymbol());
         portfolio.setCompanyName(portfolioDTO.getCompanyName());
@@ -52,11 +62,35 @@ public class PortfolioService {
         portfolio.setQuantity(portfolioDTO.getQuantity());
         portfolio.setBuyPrice(portfolioDTO.getBuyPrice());
         portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
-        // Enforce action date on create to keep purchase date system-driven.
-        portfolio.setPurchaseDate(LocalDate.now());
+        portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
         Portfolio saved = portfolioRepository.save(portfolio);
         saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
         return saved;
+    }
+
+    private Portfolio mergePortfolio(Portfolio existing, PortfolioDTO portfolioDTO) {
+        Portfolio portfolio = new Portfolio();
+        portfolio.setId(existing.getId());
+        portfolio.setSymbol(existing.getSymbol());
+        portfolio.setCompanyName(portfolioDTO.getCompanyName());
+        portfolio.setAssetType(existing.getAssetType());
+        portfolio.setQuantity(existing.getQuantity() + portfolioDTO.getQuantity());
+        portfolio.setBuyPrice(calculateWeightedBuyPrice(existing, portfolioDTO));
+        portfolio.setCurrentPrice(portfolioDTO.getCurrentPrice());
+        portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
+        return portfolio;
+    }
+
+    private Double calculateWeightedBuyPrice(Portfolio existing, PortfolioDTO portfolioDTO) {
+        BigDecimal existingCost = BigDecimal.valueOf(existing.getBuyPrice())
+                .multiply(BigDecimal.valueOf(existing.getQuantity()));
+        BigDecimal newCost = BigDecimal.valueOf(portfolioDTO.getBuyPrice())
+                .multiply(BigDecimal.valueOf(portfolioDTO.getQuantity()));
+        BigDecimal totalQuantity = BigDecimal.valueOf(existing.getQuantity() + portfolioDTO.getQuantity());
+
+        return existingCost.add(newCost)
+                .divide(totalQuantity, 4, RoundingMode.HALF_UP)
+                .doubleValue();
     }
 
     @Transactional(readOnly = true)
@@ -107,7 +141,6 @@ public class PortfolioService {
         portfolio.setPurchaseDate(portfolioDTO.getPurchaseDate());
         Portfolio saved = portfolioRepository.save(portfolio);
         saved.setAvailableBalance(balanceService.getBalance().getAvailableBalance());
-        portfolioHistoryService.recordSnapshot(saved);
         return saved;
     }
 
@@ -148,33 +181,26 @@ public class PortfolioService {
     }
 
     private boolean isStockAsset(String assetType) {
-        if (assetType == null) {
-            return false;
-        }
-        String normalized = assetType.trim().toLowerCase();
-        return normalized.equals("stock") || normalized.equals("etf");
+        return assetType != null && assetType.equalsIgnoreCase("Stock");
     }
 
     private void adjustBalanceForRequiredAmount(BigDecimal requiredAmount) {
-        if (requiredAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            return;
-        }
 
-        BigDecimal available = balanceService.getBalance().getAvailableBalance();
-        if (available.compareTo(requiredAmount) < 0) {
-            throw new InsufficientBalanceException(available.doubleValue(), requiredAmount.doubleValue());
-        }
-
-        balanceService.deductBalance(requiredAmount);
+    if (requiredAmount.compareTo(BigDecimal.ZERO) <= 0) {
+        return;
     }
+
+    balanceService.deductBalance(requiredAmount);
+}
 
     private void creditBalance(BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return;
-        }
 
-        balanceService.addBalance(amount);
+    if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+        return;
     }
+
+    balanceService.addBalance(amount);
+}
 
     private void validateId(Integer id) {
         if (id == null || id <= 0) {

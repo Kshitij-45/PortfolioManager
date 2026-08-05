@@ -17,8 +17,10 @@ function resolveApiBase() {
 let API_BASE = resolveApiBase();
 const API_BASE_CANDIDATES = buildApiBaseCandidates();
 const PRICE_LOOKUP_DEBOUNCE_MS = 350;
+const THEME_ICON_SUN = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"></path>';
+const THEME_ICON_MOON = '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 6.8 6.8 0 0 0 20 14.5z"></path>';
 
-const COLORS = ["#b7a3e6", "#9f90cc", "#cec2e9", "#a5aad7", "#c8b3df", "#aea1d4"];
+const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#ec4899", "#84cc16"];
 
 const state = {
   holdings: [],
@@ -54,6 +56,8 @@ const state = {
 
 const ui = {
   navLinks: Array.from(document.querySelectorAll(".nav-link")),
+  themeToggleBtn: document.getElementById("themeToggleBtn"),
+  themeToggleIcon: document.querySelector("#themeToggleBtn .theme-icon"),
   holdingForm: document.getElementById("holdingForm"),
   openAddMoneyModalBtn: document.getElementById("openAddMoneyModalBtn"),
   openAddPanelBtn: document.getElementById("openAddPanelBtn"),
@@ -113,6 +117,7 @@ const ui = {
 init();
 
 async function init() {
+  initTheme();
   attachEvents();
   ui.removeQuantityInput.step = "1";
   ui.removeQuantityInput.min = "1";
@@ -173,6 +178,10 @@ async function apiFetch(path, options) {
 }
 
 function attachEvents() {
+  if (ui.themeToggleBtn) {
+    ui.themeToggleBtn.addEventListener("click", onThemeToggle);
+  }
+
   for (const link of ui.navLinks) {
     link.addEventListener("click", onSidebarNavClick);
   }
@@ -249,6 +258,52 @@ function attachEvents() {
   window.addEventListener("hashchange", syncActiveNavFromHash);
 
   syncActiveNavFromHash();
+}
+
+function initTheme() {
+  const storedTheme = safelyReadTheme();
+  const startingTheme = storedTheme || "dark";
+  applyTheme(startingTheme);
+}
+
+function onThemeToggle() {
+  const currentTheme = document.body.getAttribute("data-theme") || "dark";
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+}
+
+function applyTheme(theme) {
+  const normalizedTheme = theme === "light" ? "light" : "dark";
+  document.body.setAttribute("data-theme", normalizedTheme);
+
+  if (ui.themeToggleIcon) {
+    ui.themeToggleIcon.innerHTML = normalizedTheme === "dark" ? THEME_ICON_MOON : THEME_ICON_SUN;
+  }
+
+  if (ui.themeToggleBtn) {
+    const targetTheme = normalizedTheme === "dark" ? "light" : "dark";
+    ui.themeToggleBtn.setAttribute("aria-label", `Switch to ${targetTheme} theme`);
+    ui.themeToggleBtn.setAttribute("title", `Switch to ${targetTheme} theme`);
+  }
+
+  try {
+    window.localStorage.setItem("pm-theme", normalizedTheme);
+  } catch {
+    // Ignore storage failures; theme still applies for current session.
+  }
+}
+
+function safelyReadTheme() {
+  try {
+    const value = window.localStorage.getItem("pm-theme");
+    if (value === "light" || value === "dark") {
+      return value;
+    }
+  } catch {
+    // Ignore storage read failures.
+  }
+
+  return null;
 }
 
 async function refreshPortfolioState() {
@@ -413,6 +468,7 @@ function onGlobalKeyDown(event) {
   if (event.key === "Escape" && !ui.symbolPerformanceModal.classList.contains("hidden")) {
     closeSymbolPerformanceModal();
   }
+
 }
 
 function onHoldingsTableClick(event) {
