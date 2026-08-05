@@ -753,7 +753,7 @@ async function refreshRecommendations() {
   ui.refreshRecommendationsBtn.textContent = "Refreshing...";
 
   try {
-    const response = await apiFetch("/api/recommendations");
+    const response = await apiFetch("/api/recommendations/refresh");
     if (!response.ok) {
       throw new Error(await readApiError(response));
     }
@@ -866,7 +866,14 @@ function buildRecommendationCard(item) {
 
   const recommendationLabel = humanizeRecommendation(item.recommendation);
   const badgeClass = recommendationBadgeClass(item.recommendation);
-  const reasons = Array.isArray(item.reasons) ? item.reasons.slice(0, 4) : [];
+  const rawReasons = Array.isArray(item.reasons)
+    ? item.reasons.map((reason) => String(reason || "").trim()).filter(Boolean)
+    : [];
+  const aiReason = rawReasons.find((reason) => reason.startsWith("AI insight:"));
+  const orderedReasons = aiReason
+    ? [aiReason, ...rawReasons.filter((reason) => reason !== aiReason)]
+    : rawReasons;
+  const reasons = orderedReasons.slice(0, 4);
 
   card.innerHTML = `
     <div class="rec-top">

@@ -9,6 +9,8 @@ public interface RecommendationService {
 
     RecommendationDTO getAllRecommendations();
 
+    RecommendationDTO refreshAllRecommendations();
+
     List<AssetRecommendationDTO> getStockRecommendations();
 
     List<AssetRecommendationDTO> getCryptoRecommendations();
