@@ -144,6 +144,36 @@ h1 {
   background: linear-gradient(180deg, #d0c4ea 0%, #b3a1d9 100%);
 }
 
+.btn.action-add-money {
+  background: linear-gradient(180deg, #67b0ff 0%, #2f84e7 100%);
+  border-color: #5f9de4;
+  color: #f3f9ff;
+}
+
+.btn.action-add-money:hover {
+  background: linear-gradient(180deg, #7abaff 0%, #3d8feb 100%);
+}
+
+.btn.action-add-asset {
+  background: linear-gradient(180deg, #4fd37f 0%, #238a4a 100%);
+  border-color: #3f9f63;
+  color: #f3fff7;
+}
+
+.btn.action-add-asset:hover {
+  background: linear-gradient(180deg, #63dc90 0%, #2f9957 100%);
+}
+
+.btn.action-sell {
+  background: linear-gradient(180deg, #ff6b6b 0%, #d62839 100%);
+  border-color: #dc3f50;
+  color: #fff5f5;
+}
+
+.btn.action-sell:hover {
+  background: linear-gradient(180deg, #ff8282 0%, #e03b4d 100%);
+}
+
 .btn.ghost {
   border-color: #343949;
   background: linear-gradient(180deg, #252934 0%, #1f222c 100%);
@@ -288,6 +318,43 @@ button.link-action {
   text-decoration: underline;
 }
 
+#openAddFromHoldingsBtn {
+  border: 1px solid #3f9f63;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #4fd37f 0%, #238a4a 100%);
+  color: #f3fff7;
+  font-weight: 700;
+  padding: 0.34rem 0.74rem;
+  text-decoration: none;
+}
+
+#openAddFromHoldingsBtn:hover {
+  background: linear-gradient(180deg, #63dc90 0%, #2f9957 100%);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+body:not([data-theme="light"]) .btn.action-add-asset,
+body[data-theme="dark"] .btn.action-add-asset {
+  background: linear-gradient(180deg, #4fd37f 0%, #238a4a 100%) !important;
+  border-color: #3f9f63 !important;
+  color: #f3fff7 !important;
+}
+
+body:not([data-theme="light"]) .btn.action-sell,
+body[data-theme="dark"] .btn.action-sell {
+  background: linear-gradient(180deg, #ff6b6b 0%, #d62839 100%) !important;
+  border-color: #dc3f50 !important;
+  color: #fff5f5 !important;
+}
+
+body:not([data-theme="light"]) #openAddFromHoldingsBtn,
+body[data-theme="dark"] #openAddFromHoldingsBtn {
+  background: linear-gradient(180deg, #4fd37f 0%, #238a4a 100%) !important;
+  border-color: #3f9f63 !important;
+  color: #f3fff7 !important;
+}
+
 .symbol-trigger {
   border: 0;
   padding: 0;
@@ -302,6 +369,108 @@ button.link-action {
 
 .symbol-trigger:hover {
   color: #e3daf1;
+}
+
+.symbol-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+}
+
+.asset-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid #3a4052;
+  background: #232733;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.35rem;
+  overflow: hidden;
+}
+
+.asset-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-icon-fallback {
+  color: #c7d0e6;
+}
+
+.asset-icon[data-icon-type="stock"] {
+  border-color: #355d96;
+  background: #1e2b42;
+  color: #6fb4ff;
+}
+
+.asset-icon[data-icon-type="bond"] {
+  border-color: #6a587f;
+  background: #2a2338;
+  color: #d2b7ff;
+}
+
+.asset-icon[data-icon-type="etf"] {
+  border-color: #2e6f67;
+  background: #1a3131;
+  color: #6ce6d5;
+}
+
+.asset-icon[data-icon-type="fund"] {
+  border-color: #6b5f35;
+  background: #322d1d;
+  color: #f5d774;
+}
+
+.asset-icon[data-icon-type="cash"] {
+  border-color: #2a6a45;
+  background: #1a2f23;
+  color: #79e0a7;
+}
+
+.asset-icon[data-icon-type="other"] {
+  border-color: #4d566b;
+  background: #252b36;
+  color: #b8c4de;
+}
+
+.asset-icon[data-icon-type="bitcoin"] {
+  border-color: transparent;
+  background: transparent;
+}
+
+.asset-icon-svg {
+  width: 0.92rem;
+  height: 0.92rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bitcoin-icon-svg {
+  width: 1.16rem;
+  height: 1.16rem;
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 120;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -100%);
+  transition: opacity 110ms ease;
+  border: 1px solid rgba(98, 129, 188, 0.7);
+  border-radius: 8px;
+  background: rgba(16, 22, 36, 0.92);
+  color: #e8f0ff;
+  padding: 0.34rem 0.52rem;
+  font: 600 0.75rem "IBM Plex Mono", monospace;
+  box-shadow: 0 10px 20px rgba(4, 9, 18, 0.45);
+  white-space: nowrap;
 }
 
 .holding-tools {
@@ -530,6 +699,9 @@ canvas {
 .mini-card {
   position: relative;
   overflow: hidden;
+  --card-accent: #b8a8de;
+  display: grid;
+  gap: 0.42rem;
 }
 
 .mini-card::before {
@@ -537,7 +709,84 @@ canvas {
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, #d0c4ea 0%, #ae9bd5 100%);
+  background: linear-gradient(90deg, #ffffff 0%, var(--card-accent) 100%);
+}
+
+.mini-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.52rem;
+}
+
+.mini-card-icon {
+  width: 1.72rem;
+  height: 1.72rem;
+  border-radius: 999px;
+  border: 1px solid #6f7890;
+  background: rgba(14, 19, 31, 0.5);
+  color: #d9e4ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.72rem;
+}
+
+.mini-card-icon svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cash-card {
+  --card-accent: #4abf7f;
+  border-color: #2f6f52;
+  background: linear-gradient(160deg, #22382e 0%, #1d2f28 100%);
+}
+
+.cash-card .mini-card-icon {
+  border-color: #5bc98e;
+  background: rgba(74, 191, 127, 0.2);
+  color: #8bf2b8;
+}
+
+.stocks-card {
+  --card-accent: #52a2ff;
+  border-color: #365c8f;
+  background: linear-gradient(160deg, #1f2d43 0%, #1d2739 100%);
+}
+
+.stocks-card .mini-card-icon {
+  border-color: #66b0ff;
+  background: rgba(82, 162, 255, 0.2);
+  color: #a6d4ff;
+}
+
+.bonds-card {
+  --card-accent: #c38cff;
+  border-color: #66498a;
+  background: linear-gradient(160deg, #2f2740 0%, #272135 100%);
+}
+
+.bonds-card .mini-card-icon {
+  border-color: #cda0ff;
+  background: rgba(195, 140, 255, 0.2);
+  color: #e0c5ff;
+}
+
+.crypto-card {
+  --card-accent: #ffb347;
+  border-color: #8a5e2a;
+  background: linear-gradient(160deg, #3a2d1f 0%, #30251b 100%);
+}
+
+.crypto-card .mini-card-icon {
+  border-color: #ffc26b;
+  background: rgba(255, 179, 71, 0.2);
+  color: #ffcb80;
 }
 
 .mini-card p {
@@ -861,6 +1110,30 @@ body[data-theme="light"] .btn {
   background: linear-gradient(180deg, #ffffff 0%, #edf2fd 100%);
 }
 
+body[data-theme="light"] .btn.action-add-money {
+  border-color: #8bb9ef;
+  color: #ffffff;
+  background: linear-gradient(180deg, #56a0f4 0%, #2f84e7 100%);
+}
+
+body[data-theme="light"] .btn.action-add-asset {
+  border-color: #74c48f;
+  color: #ffffff;
+  background: linear-gradient(180deg, #4dbe74 0%, #2da35a 100%);
+}
+
+body[data-theme="light"] .btn.action-sell {
+  border-color: #e691a2;
+  color: #ffffff;
+  background: linear-gradient(180deg, #ea738f 0%, #d4506f 100%);
+}
+
+body[data-theme="light"] #openAddFromHoldingsBtn {
+  border-color: #74c48f;
+  color: #ffffff;
+  background: linear-gradient(180deg, #4dbe74 0%, #2da35a 100%);
+}
+
 body[data-theme="light"] .btn.ghost {
   border-color: #ccd7eb;
   color: #42506c;
@@ -888,11 +1161,122 @@ body[data-theme="light"] .nav-link:hover {
   color: #2e3a54;
 }
 
+body[data-theme="light"] .symbol-trigger {
+  color: #2563eb;
+}
+
+body[data-theme="light"] .symbol-trigger:hover {
+  color: #1d4ed8;
+}
+
+body[data-theme="light"] .asset-icon {
+  border-color: #cfd9ec;
+  background: #f6f9ff;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="stock"] {
+  border-color: #bcd5f6;
+  background: #edf5ff;
+  color: #2563eb;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="bond"] {
+  border-color: #d7c6ec;
+  background: #f7f1ff;
+  color: #7c3aed;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="etf"] {
+  border-color: #bfe6df;
+  background: #ebfaf7;
+  color: #0f766e;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="fund"] {
+  border-color: #eedfb4;
+  background: #fff9e9;
+  color: #b7791f;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="cash"] {
+  border-color: #bfe7cc;
+  background: #edfcf2;
+  color: #15803d;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="other"] {
+  border-color: #d3deef;
+  background: #f3f7ff;
+  color: #475569;
+}
+
+body[data-theme="light"] .asset-icon[data-icon-type="bitcoin"] {
+  border-color: transparent;
+  background: transparent;
+}
+
+body[data-theme="light"] .chart-tooltip {
+  background: rgba(242, 247, 255, 0.97);
+  color: #173153;
+  border-color: rgba(89, 126, 191, 0.45);
+  box-shadow: 0 10px 20px rgba(23, 49, 83, 0.16);
+}
+
 body[data-theme="light"] label,
 body[data-theme="light"] .rec-ticker,
 body[data-theme="light"] .rec-reasons,
 body[data-theme="light"] .mini-card p {
   color: #5b657b;
+}
+
+body[data-theme="light"] .summary-grid .mini-card.cash-card {
+  border-color: #bde6cc;
+  background: linear-gradient(160deg, #f5fff9 0%, #eefcf4 100%);
+}
+
+body[data-theme="light"] .summary-grid .mini-card.stocks-card {
+  border-color: #bfd8f8;
+  background: linear-gradient(160deg, #f4f9ff 0%, #edf4ff 100%);
+}
+
+body[data-theme="light"] .summary-grid .mini-card.bonds-card {
+  border-color: #d8c9f0;
+  background: linear-gradient(160deg, #fbf7ff 0%, #f5f0ff 100%);
+}
+
+body[data-theme="light"] .summary-grid .mini-card.crypto-card {
+  border-color: #f0d7b1;
+  background: linear-gradient(160deg, #fffaf2 0%, #fff4e5 100%);
+}
+
+body[data-theme="light"] .mini-card-icon {
+  border-color: #c8d6ec;
+  background: rgba(255, 255, 255, 0.86);
+  color: #274166;
+}
+
+body[data-theme="light"] .cash-card .mini-card-icon {
+  border-color: #9cdcb5;
+  background: #effcf4;
+  color: #2f8a57;
+}
+
+body[data-theme="light"] .stocks-card .mini-card-icon {
+  border-color: #a9cdf7;
+  background: #f1f7ff;
+  color: #2563eb;
+}
+
+body[data-theme="light"] .bonds-card .mini-card-icon {
+  border-color: #d0b8f2;
+  background: #f9f3ff;
+  color: #7c3aed;
+}
+
+body[data-theme="light"] .crypto-card .mini-card-icon {
+  border-color: #f0cc97;
+  background: #fff7ea;
+  color: #b7791f;
 }
 
 body[data-theme="light"] input,

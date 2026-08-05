@@ -19,8 +19,28 @@ const API_BASE_CANDIDATES = buildApiBaseCandidates();
 const PRICE_LOOKUP_DEBOUNCE_MS = 350;
 const THEME_ICON_SUN = '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"></path>';
 const THEME_ICON_MOON = '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 6.8 6.8 0 0 0 20 14.5z"></path>';
+const FINTECH_LINE_COLOR = "#2563EB";
+const FINTECH_LINE_GLOW = "rgba(37, 99, 235, 0.45)";
+const FINTECH_AREA_TOP = "rgba(37, 99, 235, 0.35)";
+const FINTECH_AREA_BOTTOM = "rgba(37, 99, 235, 0)";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#ec4899", "#84cc16"];
+
+const STOCK_LOGO_DOMAIN_BY_TICKER = {
+  AAPL: "apple.com",
+  MSFT: "microsoft.com",
+  TSLA: "tesla.com",
+  AMZN: "amazon.com",
+  GOOGL: "abc.xyz",
+  META: "meta.com",
+  NVDA: "nvidia.com"
+};
+
+const CHART_HOVER_STATE = {
+  history: null,
+  symbol: null,
+  tooltip: null
+};
 
 const state = {
   holdings: [],
@@ -221,6 +241,16 @@ function attachEvents() {
   ui.holdingsSearch.addEventListener("input", onViewControlChange);
   ui.holdingsTypeFilter.addEventListener("change", onViewControlChange);
   ui.holdingsSort.addEventListener("change", onViewControlChange);
+
+  if (ui.historyChart) {
+    ui.historyChart.addEventListener("mousemove", onHistoryChartHover);
+    ui.historyChart.addEventListener("mouseleave", hideChartTooltip);
+  }
+
+  if (ui.symbolPerformanceChart) {
+    ui.symbolPerformanceChart.addEventListener("mousemove", onSymbolChartHover);
+    ui.symbolPerformanceChart.addEventListener("mouseleave", hideChartTooltip);
+  }
 
   if (ui.refreshRecommendationsBtn) {
     ui.refreshRecommendationsBtn.addEventListener("click", () => {
@@ -1483,13 +1513,7 @@ function renderTable() {
     const pnl = marketValue - holding.quantity * holding.avgPrice;
 
     const tickerCell = setCell(clone, "ticker", "");
-    const symbolButton = document.createElement("button");
-    symbolButton.type = "button";
-    symbolButton.className = "symbol-trigger";
-    symbolButton.dataset.holdingId = String(holding.id);
-    symbolButton.textContent = holding.ticker;
-    symbolButton.setAttribute("aria-label", `View ${holding.ticker} price performance chart`);
-    tickerCell.append(symbolButton);
+    tickerCell.append(buildHoldingSymbolContent(holding));
 
     setCell(clone, "companyName", holding.companyName);
     setCell(clone, "assetType", holding.assetType);
@@ -1505,6 +1529,114 @@ function renderTable() {
   }
 }
 
+function buildHoldingSymbolContent(holding) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "symbol-with-icon";
+
+  const iconMeta = resolveHoldingIcon(holding);
+  wrapper.append(buildHoldingIconNode(iconMeta, holding));
+
+  const symbolButton = document.createElement("button");
+  symbolButton.type = "button";
+  symbolButton.className = "symbol-trigger";
+  symbolButton.dataset.holdingId = String(holding.id);
+  symbolButton.textContent = holding.ticker;
+  symbolButton.setAttribute("aria-label", `View ${holding.ticker} price performance chart`);
+  wrapper.append(symbolButton);
+
+  return wrapper;
+}
+
+function buildHoldingIconNode(iconMeta, holding) {
+  const container = document.createElement("span");
+  container.className = "asset-icon";
+  container.dataset.iconType = iconMeta.iconType || "other";
+  container.setAttribute("aria-label", `${holding.assetType} icon`);
+  container.setAttribute("title", `${holding.assetType} icon`);
+
+  if (iconMeta.url) {
+    const image = document.createElement("img");
+    image.className = "asset-icon-img";
+    image.src = iconMeta.url;
+    image.alt = `${holding.ticker} logo`;
+    image.loading = "lazy";
+    image.referrerPolicy = "no-referrer";
+    image.addEventListener("error", () => {
+      container.classList.add("asset-icon-fallback");
+      container.innerHTML = buildAssetTypeIconSvg(iconMeta.iconType);
+    });
+    container.append(image);
+    return container;
+  }
+
+  container.classList.add("asset-icon-fallback");
+  container.innerHTML = buildAssetTypeIconSvg(iconMeta.iconType);
+  return container;
+}
+
+function resolveHoldingIcon(holding) {
+  const type = normalizeAssetType(holding.assetType);
+  const ticker = String(holding.ticker || "").trim().toUpperCase();
+
+  if (type === "Stock") {
+    const domain = STOCK_LOGO_DOMAIN_BY_TICKER[ticker];
+    return {
+      url: domain ? `https://logo.clearbit.com/${domain}` : "",
+      iconType: "stock"
+    };
+  }
+
+  if (type === "Crypto") {
+    return { url: "", iconType: "bitcoin" };
+  }
+
+  if (type === "ETF") {
+    return { url: "", iconType: "etf" };
+  }
+
+  if (type === "Bond") {
+    return { url: "", iconType: "bond" };
+  }
+
+  if (type === "Mutual Fund") {
+    return { url: "", iconType: "fund" };
+  }
+
+  if (type === "Cash") {
+    return { url: "", iconType: "cash" };
+  }
+
+  return { url: "", iconType: "other" };
+}
+
+function buildAssetTypeIconSvg(iconType) {
+  if (iconType === "stock") {
+    return '<svg class="asset-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5h16M6 15l3-3 3 2 6-6"/><circle cx="18" cy="8" r="1.5"/></svg>';
+  }
+
+  if (iconType === "bitcoin") {
+    return '<svg class="asset-icon-svg bitcoin-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#F7931A" stroke="#F7931A" stroke-width="1.5"/><path d="M10.3 7.2v9.6M12.6 7.2v9.6M9.2 9.2h4.1a1.9 1.9 0 1 1 0 3.8H9.2M9.2 13.1h4.6a2 2 0 1 1 0 4H9.2" fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+
+  if (iconType === "bond") {
+    return '<svg class="asset-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="6.5" width="15" height="11" rx="2"/><path d="M8 10h8M8 13h5"/></svg>';
+  }
+
+  if (iconType === "etf") {
+    return '<svg class="asset-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 17V13M10 17V9M14.5 17V11M19 17V7"/><path d="M4 17.5h16"/></svg>';
+  }
+
+  if (iconType === "fund") {
+    return '<svg class="asset-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 15.5a3 3 0 0 1 3-3h1a3 3 0 0 0 3-3 3 3 0 0 1 3-3h3"/><path d="M5 18h14"/></svg>';
+  }
+
+  if (iconType === "cash") {
+    return '<svg class="asset-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="10" rx="2"/><circle cx="12" cy="12" r="2.2"/></svg>';
+  }
+
+  return '<svg class="asset-icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><path d="M9 12h6"/></svg>';
+}
+
 function renderSymbolPerformanceChart() {
   const ctx = ui.symbolPerformanceChart.getContext("2d");
   const width = ui.symbolPerformanceChart.width;
@@ -1513,56 +1645,28 @@ function renderSymbolPerformanceChart() {
   ctx.clearRect(0, 0, width, height);
 
   if (state.symbolPerformance.points.length === 0) {
+    CHART_HOVER_STATE.symbol = null;
+    hideChartTooltip();
     drawSymbolNoData(ctx, width, height);
     return;
   }
 
-  const values = state.symbolPerformance.points.map((point) => point.value);
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = Math.max(0.01, max - min);
+  const chartData = state.symbolPerformance.points.map((point) => ({
+    label: formatShortDate(point.date),
+    value: point.value
+  }));
 
-  const padding = { top: 20, right: 20, bottom: 30, left: 60 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-
-  ctx.strokeStyle = "#3a3e52";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i += 1) {
-    const y = padding.top + (i / 4) * chartHeight;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(width - padding.right, y);
-    ctx.stroke();
+  const plotMeta = renderFintechLineChart(ctx, width, height, chartData);
+  if (!plotMeta) {
+    CHART_HOVER_STATE.symbol = null;
+    return;
   }
 
-  ctx.strokeStyle = "#b7a3e6";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-
-  const pointCount = state.symbolPerformance.points.length;
-  state.symbolPerformance.points.forEach((point, index) => {
-    const x = pointCount === 1
-      ? padding.left + chartWidth / 2
-      : padding.left + (index / (pointCount - 1)) * chartWidth;
-    const y = padding.top + ((max - point.value) / range) * chartHeight;
-
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-  ctx.stroke();
-
-  const firstPoint = state.symbolPerformance.points[0];
-  const lastPoint = state.symbolPerformance.points[pointCount - 1];
-  ctx.fillStyle = "#b4bdd6";
-  ctx.font = "12px IBM Plex Mono";
-  ctx.fillText(formatCurrency(max), 6, padding.top + 4);
-  ctx.fillText(formatCurrency(min), 6, height - padding.bottom);
-  ctx.fillText(formatShortDate(firstPoint.date), padding.left, height - 8);
-  ctx.fillText(formatShortDate(lastPoint.date), width - 76, height - 8);
+  CHART_HOVER_STATE.symbol = {
+    canvas: ui.symbolPerformanceChart,
+    points: plotMeta.points,
+    formatValue: formatCurrency
+  };
 }
 
 function drawSymbolNoData(ctx, width, height) {
@@ -1663,22 +1767,59 @@ function renderHistoryChart() {
   ctx.clearRect(0, 0, width, height);
 
   if (state.history.length === 0) {
+    CHART_HOVER_STATE.history = null;
+    hideChartTooltip();
     drawNoData(ctx, width, height);
     return;
   }
 
-  const values = state.history.map((h) => h.value);
+  const plotMeta = renderFintechLineChart(ctx, width, height, state.history);
+  if (!plotMeta) {
+    CHART_HOVER_STATE.history = null;
+    return;
+  }
+
+  CHART_HOVER_STATE.history = {
+    canvas: ui.historyChart,
+    points: plotMeta.points,
+    formatValue: formatCurrency
+  };
+}
+
+function drawNoData(ctx, width, height) {
+  ctx.fillStyle = "#b4bdd6";
+  ctx.font = "15px Space Grotesk";
+  ctx.fillText("Add holdings with purchase dates to plot profit/loss.", 20, height / 2);
+}
+
+function renderFintechLineChart(ctx, width, height, sourcePoints) {
+  if (!Array.isArray(sourcePoints) || sourcePoints.length === 0) {
+    return null;
+  }
+
+  const points = sourcePoints
+    .map((point) => ({
+      label: String(point.label || ""),
+      value: Number(point.value)
+    }))
+    .filter((point) => Number.isFinite(point.value));
+
+  if (points.length === 0) {
+    return null;
+  }
+
+  const values = points.map((point) => point.value);
   const max = Math.max(...values);
   const min = Math.min(...values);
-  const range = Math.max(1, max - min);
+  const range = Math.max(0.01, max - min);
 
-  const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+  const padding = { top: 20, right: 22, bottom: 34, left: 58 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
+  const bottomY = padding.top + chartHeight;
 
-  ctx.strokeStyle = "#3a3e52";
+  ctx.strokeStyle = "rgba(129, 146, 176, 0.18)";
   ctx.lineWidth = 1;
-
   for (let i = 0; i <= 4; i += 1) {
     const y = padding.top + (i / 4) * chartHeight;
     ctx.beginPath();
@@ -1687,35 +1828,47 @@ function renderHistoryChart() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#b7a3e6";
-  ctx.lineWidth = 3;
+  const plotPoints = points.map((point, index) => ({
+    x: points.length === 1 ? padding.left + chartWidth / 2 : padding.left + (index / (points.length - 1)) * chartWidth,
+    y: padding.top + ((max - point.value) / range) * chartHeight,
+    label: point.label,
+    value: point.value
+  }));
+
+  const areaGradient = ctx.createLinearGradient(0, padding.top, 0, bottomY);
+  areaGradient.addColorStop(0, FINTECH_AREA_TOP);
+  areaGradient.addColorStop(1, FINTECH_AREA_BOTTOM);
+
   ctx.beginPath();
+  drawSmoothLinePath(ctx, plotPoints);
+  ctx.lineTo(plotPoints[plotPoints.length - 1].x, bottomY);
+  ctx.lineTo(plotPoints[0].x, bottomY);
+  ctx.closePath();
+  ctx.fillStyle = areaGradient;
+  ctx.fill();
 
-  const pointCount = state.history.length;
+  ctx.save();
+  ctx.shadowColor = FINTECH_LINE_GLOW;
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.beginPath();
+  drawSmoothLinePath(ctx, plotPoints);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = FINTECH_LINE_COLOR;
+  ctx.stroke();
+  ctx.restore();
 
-  state.history.forEach((point, index) => {
-    const x = pointCount === 1
-      ? padding.left + chartWidth / 2
-      : padding.left + (index / (pointCount - 1)) * chartWidth;
-    const y = padding.top + ((max - point.value) / range) * chartHeight;
-
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
-    }
-  });
-
+  ctx.beginPath();
+  drawSmoothLinePath(ctx, plotPoints);
+  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = "#66a6ff";
   ctx.stroke();
 
-  if (pointCount === 1) {
-    const point = state.history[0];
-    const x = padding.left + chartWidth / 2;
-    const y = padding.top + ((max - point.value) / range) * chartHeight;
-
-    ctx.fillStyle = "#b7a3e6";
+  if (plotPoints.length === 1) {
+    ctx.fillStyle = FINTECH_LINE_COLOR;
     ctx.beginPath();
-    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.arc(plotPoints[0].x, plotPoints[0].y, 4.5, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -1723,14 +1876,93 @@ function renderHistoryChart() {
   ctx.font = "12px IBM Plex Mono";
   ctx.fillText(formatCurrency(max), 6, padding.top + 4);
   ctx.fillText(formatCurrency(min), 6, height - padding.bottom);
-  ctx.fillText(state.history[0].label, padding.left, height - 8);
-  ctx.fillText(state.history[state.history.length - 1].label, width - 70, height - 8);
+  ctx.fillText(plotPoints[0].label, padding.left, height - 8);
+  ctx.fillText(plotPoints[plotPoints.length - 1].label, width - 86, height - 8);
+
+  return { points: plotPoints };
 }
 
-function drawNoData(ctx, width, height) {
-  ctx.fillStyle = "#b4bdd6";
-  ctx.font = "15px Space Grotesk";
-  ctx.fillText("Add holdings with purchase dates to plot profit/loss.", 20, height / 2);
+function drawSmoothLinePath(ctx, points) {
+  if (!points || points.length === 0) {
+    return;
+  }
+
+  ctx.moveTo(points[0].x, points[0].y);
+
+  if (points.length === 1) {
+    ctx.lineTo(points[0].x + 0.01, points[0].y);
+    return;
+  }
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const current = points[i];
+    const next = points[i + 1];
+    const midX = (current.x + next.x) / 2;
+    const midY = (current.y + next.y) / 2;
+    ctx.quadraticCurveTo(current.x, current.y, midX, midY);
+  }
+
+  const last = points[points.length - 1];
+  ctx.lineTo(last.x, last.y);
+}
+
+function onHistoryChartHover(event) {
+  handleChartHover(event, CHART_HOVER_STATE.history);
+}
+
+function onSymbolChartHover(event) {
+  handleChartHover(event, CHART_HOVER_STATE.symbol);
+}
+
+function handleChartHover(event, chartState) {
+  if (!chartState || !chartState.canvas || !Array.isArray(chartState.points) || chartState.points.length === 0) {
+    hideChartTooltip();
+    return;
+  }
+
+  const rect = chartState.canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+
+  let nearest = chartState.points[0];
+  let nearestDistance = Math.abs(x - nearest.x);
+  for (const point of chartState.points) {
+    const distance = Math.abs(x - point.x);
+    if (distance < nearestDistance) {
+      nearest = point;
+      nearestDistance = distance;
+    }
+  }
+
+  if (Math.hypot(x - nearest.x, y - nearest.y) > 20 && nearestDistance > 22) {
+    hideChartTooltip();
+    return;
+  }
+
+  const tooltip = ensureChartTooltip();
+  const valueText = typeof chartState.formatValue === "function" ? chartState.formatValue(nearest.value) : String(nearest.value);
+  tooltip.textContent = `${nearest.label}: ${valueText}`;
+  tooltip.style.opacity = "1";
+  tooltip.style.left = `${event.clientX + window.scrollX + 14}px`;
+  tooltip.style.top = `${event.clientY + window.scrollY - 14}px`;
+}
+
+function ensureChartTooltip() {
+  if (CHART_HOVER_STATE.tooltip) {
+    return CHART_HOVER_STATE.tooltip;
+  }
+
+  const tooltip = document.createElement("div");
+  tooltip.className = "chart-tooltip";
+  document.body.append(tooltip);
+  CHART_HOVER_STATE.tooltip = tooltip;
+  return tooltip;
+}
+
+function hideChartTooltip() {
+  if (CHART_HOVER_STATE.tooltip) {
+    CHART_HOVER_STATE.tooltip.style.opacity = "0";
+  }
 }
 
 function rebuildPerformanceHistory() {
