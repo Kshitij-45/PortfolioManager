@@ -5,6 +5,7 @@ import com.example.dto.IndicatorDTO;
 import com.example.dto.MarketCandleDTO;
 import com.example.dto.RecommendationDTO;
 import com.example.exception.RecommendationProcessingException;
+import org.springframework.cache.annotation.CacheEvict;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
@@ -78,6 +79,12 @@ public class RecommendationServiceImpl implements RecommendationService {
         } catch (Exception e) {
             throw new RecommendationProcessingException("Unable to compute recommendation set", e);
         }
+    }
+
+    @Override
+    @CacheEvict(value = "recommendations", allEntries = true, cacheManager = "recommendationCacheManager")
+    public RecommendationDTO refreshAllRecommendations() {
+        return getAllRecommendations();
     }
 
     @Override

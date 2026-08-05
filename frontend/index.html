@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260805b" />
 </head>
 <body>
   <div class="shell">
@@ -34,9 +34,9 @@
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"></path>
           </svg>
         </button>
-        <button id="openAddMoneyModalBtn" class="btn" type="button">+ Add Money</button>
-        <button id="openAddPanelBtn" class="btn" type="button">+ Add Asset</button>
-        <button id="jumpHoldingsBtn" class="btn ghost" type="button">Remove Asset</button>
+        <button id="openAddMoneyModalBtn" class="btn action-add-money" type="button">+ Add Money</button>
+        <button id="openAddPanelBtn" class="btn action-add-asset" type="button">+ Add Asset</button>
+        <button id="jumpHoldingsBtn" class="btn action-sell" type="button">Sell Asset</button>
         <button id="refreshPricesBtn" class="btn ghost" type="button">Refresh</button>
       </div>
     </header>
@@ -112,20 +112,40 @@
         </section>
 
         <section class="summary-grid">
-          <article class="panel mini-card">
-            <p>Cash Balance</p>
+          <article class="panel mini-card cash-card">
+            <div class="mini-card-head">
+              <span class="mini-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="2"></rect><circle cx="12" cy="12" r="2.4"></circle></svg>
+              </span>
+              <p>Cash Balance</p>
+            </div>
             <h3 id="cashValue">$0.00</h3>
           </article>
-          <article class="panel mini-card">
-            <p>Stocks Value</p>
+          <article class="panel mini-card stocks-card">
+            <div class="mini-card-head">
+              <span class="mini-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 18h16"></path><path d="M6.5 14.5 10 11l3 2 5-6"></path><circle cx="18" cy="7" r="1.4"></circle></svg>
+              </span>
+              <p>Stocks Value</p>
+            </div>
             <h3 id="stocksValue">$0.00</h3>
           </article>
-          <article class="panel mini-card">
-            <p>Bonds Value</p>
+          <article class="panel mini-card bonds-card">
+            <div class="mini-card-head">
+              <span class="mini-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="4.5" y="6" width="15" height="12" rx="2"></rect><path d="M8 10h8M8 13h5"></path></svg>
+              </span>
+              <p>Bonds Value</p>
+            </div>
             <h3 id="bondsValue">$0.00</h3>
           </article>
-          <article class="panel mini-card">
-            <p>Crypto Value</p>
+          <article class="panel mini-card crypto-card">
+            <div class="mini-card-head">
+              <span class="mini-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M10.3 7.4v9.2M12.7 7.4v9.2M9.2 9.2h4.1a1.9 1.9 0 0 1 0 3.8H9.2M9.2 13h4.6a2 2 0 1 1 0 4H9.2"></path></svg>
+              </span>
+              <p>Crypto Value</p>
+            </div>
             <h3 id="cryptoValue">$0.00</h3>
           </article>
         </section>
@@ -239,8 +259,8 @@
     <div class="modal-backdrop" data-close-modal="true"></div>
     <div class="modal-card panel" role="dialog" aria-modal="true" aria-labelledby="removeAssetTitle">
       <div class="modal-header">
-        <h2 id="removeAssetTitle">Remove Asset</h2>
-        <button id="closeRemoveAssetModalBtn" class="btn ghost" type="button" aria-label="Close remove asset form">Close</button>
+        <h2 id="removeAssetTitle">Sell Asset</h2>
+        <button id="closeRemoveAssetModalBtn" class="btn ghost" type="button" aria-label="Close sell asset form">Close</button>
       </div>
       <form id="removeHoldingForm" class="stack-form">
         <label>
@@ -249,10 +269,10 @@
         </label>
         <p id="removeHoldingAvailable" class="muted form-note"></p>
         <label>
-          Shares To Remove
+          Shares To Sell
           <input id="removeQuantityInput" name="removeQuantity" type="number" min="1" step="1" required placeholder="1" />
         </label>
-        <button id="removeHoldingSubmit" class="btn danger" type="submit">Remove Shares</button>
+        <button id="removeHoldingSubmit" class="btn danger" type="submit">Sell Shares</button>
       </form>
     </div>
   </div>
@@ -306,6 +326,6 @@
     </tr>
   </template>
 
-  <script type="module" src="app.js?v=20260805a"></script>
+  <script src="app.js?v=20260805a" defer></script>
 </body>
 </html>

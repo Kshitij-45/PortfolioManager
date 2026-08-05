@@ -2,6 +2,7 @@ package com.example;
 
 import com.example.service.TechnicalIndicatorService;
 import com.example.service.TechnicalIndicatorServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,5 +29,10 @@ public class AppConfig {
     @Bean
     public TechnicalIndicatorService technicalIndicatorService() {
         return new TechnicalIndicatorServiceImpl();
+    }
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper();
     }
 }
