@@ -752,9 +752,16 @@ body.modal-open {
 .rec-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .btn.view-details-btn {
+  padding: 0.36rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.btn.buy-asset-btn {
   padding: 0.36rem 0.7rem;
   font-size: 0.78rem;
 }

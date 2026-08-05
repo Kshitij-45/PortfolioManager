@@ -873,6 +873,15 @@ function buildRecommendationCard(item) {
   const actions = document.createElement("div");
   actions.className = "rec-actions";
 
+  const buyBtn = document.createElement("button");
+  buyBtn.type = "button";
+  buyBtn.className = "btn buy-asset-btn";
+  buyBtn.textContent = "Buy Asset";
+  buyBtn.addEventListener("click", () => {
+    openAddAssetModal();
+    prefillHoldingFormFromRecommendation(item);
+  });
+
   const detailsBtn = document.createElement("button");
   detailsBtn.type = "button";
   detailsBtn.className = "btn ghost view-details-btn";
@@ -885,6 +894,7 @@ function buildRecommendationCard(item) {
     window.open(`https://finance.yahoo.com/quote/${ticker}`, "_blank", "noopener");
   });
 
+  actions.append(buyBtn);
   actions.append(detailsBtn);
   card.append(actions);
 
@@ -905,6 +915,43 @@ function recommendationBadgeClass(value) {
   if (normalized === "BUY") return "buy";
   if (normalized === "HOLD") return "hold";
   return "avoid";
+}
+
+function prefillHoldingFormFromRecommendation(item) {
+  const ticker = String(item?.ticker || "").trim().toUpperCase();
+  const companyName = String(item?.companyName || "").trim();
+  const mappedAssetType = mapRecommendationAssetType(String(item?.assetType || ""));
+  const currentPrice = Number(item?.currentPrice || 0);
+
+  ui.holdingForm.elements.ticker.value = ticker;
+  ui.holdingForm.elements.companyName.value = companyName;
+  ui.holdingForm.elements.assetType.value = mappedAssetType;
+  ui.holdingForm.elements.quantity.value = "1";
+
+  if (Number.isFinite(currentPrice) && currentPrice > 0) {
+    const formattedPrice = currentPrice.toFixed(2);
+    ui.holdingForm.elements.avgPrice.value = formattedPrice;
+    ui.holdingForm.elements.currentPrice.value = formattedPrice;
+    setPriceLookupStatus(`Prefilled market price for ${ticker || "asset"}.`);
+  } else {
+    ui.holdingForm.elements.avgPrice.value = "";
+    ui.holdingForm.elements.currentPrice.value = "";
+    setPriceLookupStatus("Price unavailable from suggestion. Enter or fetch market price.");
+  }
+
+  applyTodayPurchaseDate();
+}
+
+function mapRecommendationAssetType(assetType) {
+  const normalized = String(assetType || "").trim().toLowerCase();
+
+  if (normalized === "stock") return "Stock";
+  if (normalized === "crypto") return "Crypto";
+  if (normalized === "etf" || normalized === "etf/fund") return "ETF";
+  if (normalized === "bond" || normalized === "bond etf") return "Bond";
+  if (normalized === "mutual fund") return "Mutual Fund";
+  if (normalized === "cash") return "Cash";
+  return "Other";
 }
 
 function escapeHtml(value) {
@@ -1445,12 +1492,14 @@ function renderTable() {
     tickerCell.append(symbolButton);
 
     setCell(clone, "companyName", holding.companyName);
+    setCell(clone, "assetType", holding.assetType);
     setCell(clone, "quantity", formatNumber(holding.quantity, 0));
     setCell(clone, "avgPrice", formatCurrency(holding.avgPrice));
     setCell(clone, "currentPrice", formatCurrency(holding.currentPrice));
 
     const pnlCell = setCell(clone, "pnl", formatCurrency(pnl));
     pnlCell.classList.add(pnl >= 0 ? "positive" : "negative");
+    setCell(clone, "purchaseDate", formatDate(holding.purchaseDate));
 
     ui.holdingsBody.append(clone);
   }
